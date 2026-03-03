@@ -1,0 +1,459 @@
+#!/usr/bin/env bash
+#
+# SOPS Bootstrap Script
+# Detects environment and installs development tools idempotently.
+#
+# Usage:
+#   ./bootstrap.sh           # Install all tools for detected environment
+#   ./bootstrap.sh --check   # Check what's installed without changing anything
+#
+set -euo pipefail
+
+# Colors for output (disabled if not a terminal)
+if [[ -t 1 ]]; then
+    GREEN='\033[0;32m'
+    YELLOW='\033[0;33m'
+    RED='\033[0;31m'
+    RESET='\033[0m'
+else
+    GREEN=''
+    YELLOW=''
+    RED=''
+    RESET=''
+fi
+
+log_ok()   { echo -e "${GREEN}✓${RESET} $1"; }
+log_warn() { echo -e "${YELLOW}⚠${RESET} $1"; }
+log_err()  { echo -e "${RED}✗${RESET} $1"; }
+log_info() { echo "  $1"; }
+
+# Detect environment
+# Currently detected: claude-cli, claude-code, codespaces, github-actions,
+#                     devcontainer, container, vscode, local
+# Future candidates (not yet implemented):
+#   - GitPod ($GITPOD_WORKSPACE_ID)
+#   - WSL (/proc/version contains "microsoft")
+#   - macOS (uname == Darwin) - uses brew instead of apt
+#   - Replit ($REPL_ID)
+#   - Coder ($CODER_WORKSPACE_ID)
+detect_env() {
+    # Claude CLI in Sprite VM (check first - most specific)
+    if [[ -d "/.sprite" ]]; then
+        echo "claude-cli"
+    # Claude Code desktop
+    elif [[ -n "${CLAUDE_CODE_EMIT_TOOL_USE_SUMMARIES:-}" ]] || [[ -n "${CLAUDE_CODE_ENTRYPOINT:-}" ]]; then
+        echo "claude-code"
+    elif [[ -n "${CODESPACES:-}" ]]; then
+        echo "codespaces"
+    elif [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+        echo "github-actions"
+    elif [[ -n "${REMOTE_CONTAINERS:-}" ]]; then
+        echo "devcontainer"
+    elif [[ -f /.dockerenv ]] || [[ -f /run/.containerenv ]]; then
+        echo "container"
+    elif [[ "${TERM_PROGRAM:-}" == "vscode" ]]; then
+        echo "vscode"
+    else
+        echo "local"
+    fi
+}
+
+# Check if a command exists
+has_cmd() {
+    command -v "$1" &>/dev/null
+}
+
+# Get version of a tool (first line, numbers only)
+get_version() {
+    "$1" --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1
+}
+
+# Install uv (Python package manager)
+ensure_uv() {
+    if has_cmd uv; then
+        log_ok "uv $(get_version uv)"
+        return 0
+    fi
+
+    if [[ "${CHECK_ONLY:-}" == "1" ]]; then
+        log_warn "uv not installed"
+        return 1
+    fi
+
+    log_info "Installing uv..."
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+
+    # Add to PATH for this session
+    export PATH="$HOME/.local/bin:$PATH"
+
+    if has_cmd uv; then
+        log_ok "uv $(get_version uv) installed"
+    else
+        log_err "Failed to install uv"
+        return 1
+    fi
+}
+
+# Install ruff (Python linter)
+ensure_ruff() {
+    if has_cmd ruff; then
+        log_ok "ruff $(get_version ruff)"
+        return 0
+    fi
+
+    if [[ "${CHECK_ONLY:-}" == "1" ]]; then
+        log_warn "ruff not installed"
+        return 1
+    fi
+
+    log_info "Installing ruff..."
+    if has_cmd uv; then
+        uv tool install ruff
+    elif has_cmd pip; then
+        pip install --user ruff
+    else
+        log_err "Cannot install ruff: no uv or pip"
+        return 1
+    fi
+
+    if has_cmd ruff; then
+        log_ok "ruff $(get_version ruff) installed"
+    else
+        log_err "Failed to install ruff"
+        return 1
+    fi
+}
+
+# Install pre-commit (git hooks)
+ensure_precommit() {
+    local env="$1"
+
+    # Skip in Claude Code - hooks don't run there
+    if [[ "$env" == "claude-code" ]]; then
+        log_info "pre-commit skipped (Claude Code environment)"
+        return 0
+    fi
+
+    if has_cmd pre-commit; then
+        log_ok "pre-commit $(get_version pre-commit)"
+        return 0
+    fi
+
+    if [[ "${CHECK_ONLY:-}" == "1" ]]; then
+        log_warn "pre-commit not installed"
+        return 1
+    fi
+
+    log_info "Installing pre-commit..."
+    if has_cmd uv; then
+        uv tool install pre-commit
+    elif has_cmd pip; then
+        pip install --user pre-commit
+    else
+        log_err "Cannot install pre-commit: no uv or pip"
+        return 1
+    fi
+
+    if has_cmd pre-commit; then
+        log_ok "pre-commit $(get_version pre-commit) installed"
+    else
+        log_err "Failed to install pre-commit"
+        return 1
+    fi
+}
+
+# Install jq (JSON processor, required by ensure-fresh-branch hook)
+ensure_jq() {
+    if has_cmd jq; then
+        log_ok "jq $(get_version jq)"
+        return 0
+    fi
+
+    if [[ "${CHECK_ONLY:-}" == "1" ]]; then
+        log_warn "jq not installed"
+        return 1
+    fi
+
+    log_info "Installing jq..."
+    if has_cmd apt-get; then
+        sudo apt-get update -qq && sudo apt-get install -y -qq jq
+    elif has_cmd brew; then
+        brew install jq
+    else
+        log_warn "Cannot install jq: no apt or brew"
+        return 1
+    fi
+
+    if has_cmd jq; then
+        log_ok "jq $(get_version jq) installed"
+    else
+        log_err "Failed to install jq"
+        return 1
+    fi
+}
+
+# Install elan and Lean 4 toolchain
+ensure_elan() {
+    if has_cmd elan; then
+        log_ok "elan $(get_version elan)"
+        return 0
+    fi
+
+    if [[ "${CHECK_ONLY:-}" == "1" ]]; then
+        log_warn "elan not installed"
+        return 1
+    fi
+
+    log_info "Installing elan (Lean version manager)..."
+    curl -sSf https://elan.lean-lang.org/elan-init.sh | sh -s -- -y --default-toolchain stable
+
+    # Add to PATH for this session
+    export PATH="$HOME/.elan/bin:$PATH"
+
+    if has_cmd elan; then
+        log_ok "elan $(get_version elan) installed"
+    else
+        log_err "Failed to install elan"
+        return 1
+    fi
+}
+
+# Build the Lean project and fetch Mathlib cache
+ensure_lean_project() {
+    export PATH="$HOME/.elan/bin:$PATH"
+
+    if ! has_cmd lake; then
+        log_warn "lake not available (elan not installed?)"
+        return 1
+    fi
+
+    log_ok "lake ($(lake --version 2>&1 | head -1))"
+
+    if [[ "${CHECK_ONLY:-}" == "1" ]]; then
+        if [[ -d "ConnesLean/.lake" ]]; then
+            log_ok "Lean project exists"
+        else
+            log_warn "Lean project not built"
+            return 1
+        fi
+        return 0
+    fi
+
+    if [[ -d "ConnesLean" ]]; then
+        log_info "Fetching Mathlib cache..."
+        (cd ConnesLean && lake exe cache get 2>&1 | tee -a /tmp/lake_cache.log | tail -1)
+        log_info "Building ConnesLean..."
+        (cd ConnesLean && lake build ConnesLean 2>&1 | tee -a /tmp/lake_build.log | tail -5)
+        log_ok "Lean project built"
+    else
+        log_warn "ConnesLean directory not found"
+        return 1
+    fi
+}
+
+# Install VS Code Lean 4 extension (LSP integration, Infoview, tactic suggestions)
+ensure_vscode_lean() {
+    local env="$1"
+
+    # Only install in environments where VS Code is the active editor
+    case "$env" in
+        vscode|codespaces|devcontainer)
+            ;;
+        *)
+            log_info "VS Code Lean 4 extension skipped ($env environment)"
+            return 0
+            ;;
+    esac
+
+    if ! has_cmd code; then
+        log_warn "VS Code CLI 'code' not found on PATH"
+        return 1
+    fi
+
+    if code --list-extensions 2>/dev/null | grep -q 'leanprover.lean4'; then
+        log_ok "VS Code Lean 4 extension"
+        return 0
+    fi
+
+    if [[ "${CHECK_ONLY:-}" == "1" ]]; then
+        log_warn "VS Code Lean 4 extension not installed"
+        return 1
+    fi
+
+    log_info "Installing VS Code Lean 4 extension..."
+    code --install-extension leanprover.lean4
+
+    if code --list-extensions 2>/dev/null | grep -q 'leanprover.lean4'; then
+        log_ok "VS Code Lean 4 extension installed"
+    else
+        log_warn "VS Code Lean 4 extension installation may have failed"
+        return 1
+    fi
+}
+
+# Install shellcheck (shell linter)
+ensure_shellcheck() {
+    if has_cmd shellcheck; then
+        log_ok "shellcheck $(get_version shellcheck)"
+        return 0
+    fi
+
+    if [[ "${CHECK_ONLY:-}" == "1" ]]; then
+        log_warn "shellcheck not installed"
+        return 1
+    fi
+
+    log_info "Installing shellcheck..."
+    if has_cmd apt-get; then
+        sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+    elif has_cmd brew; then
+        brew install shellcheck
+    else
+        log_warn "Cannot install shellcheck: no apt or brew"
+        return 1
+    fi
+
+    if has_cmd shellcheck; then
+        log_ok "shellcheck $(get_version shellcheck) installed"
+    else
+        log_err "Failed to install shellcheck"
+        return 1
+    fi
+}
+
+# Install ripgrep (needed by lean-lsp-mcp local search)
+ensure_ripgrep() {
+    if has_cmd rg; then
+        log_ok "ripgrep $(get_version rg)"
+        return 0
+    fi
+
+    if [[ "${CHECK_ONLY:-}" == "1" ]]; then
+        log_warn "ripgrep not installed"
+        return 1
+    fi
+
+    log_info "Installing ripgrep..."
+    if has_cmd apt-get; then
+        sudo apt-get update -qq && sudo apt-get install -y -qq ripgrep
+    elif has_cmd brew; then
+        brew install ripgrep
+    else
+        log_warn "Cannot install ripgrep: no apt or brew"
+        return 1
+    fi
+
+    if has_cmd rg; then
+        log_ok "ripgrep $(get_version rg) installed"
+    else
+        log_err "Failed to install ripgrep"
+        return 1
+    fi
+}
+
+# Configure lean-lsp-mcp server for Claude Code
+ensure_lean_lsp_mcp() {
+    local env="$1"
+
+    # Only relevant when Claude Code is available
+    if ! has_cmd claude; then
+        log_info "lean-lsp-mcp skipped (claude not available)"
+        return 0
+    fi
+
+    # Check if already configured
+    if [[ -f ".mcp.json" ]] && has_cmd jq && jq -e '.mcpServers["lean-lsp"]' .mcp.json &>/dev/null; then
+        log_ok "lean-lsp-mcp configured"
+        return 0
+    fi
+
+    if [[ "${CHECK_ONLY:-}" == "1" ]]; then
+        log_warn "lean-lsp-mcp not configured"
+        return 1
+    fi
+
+    log_info "Adding lean-lsp-mcp server to Claude Code..."
+    claude mcp add lean-lsp -s project -- uvx lean-lsp-mcp --loogle-local
+
+    if [[ -f ".mcp.json" ]] && has_cmd jq && jq -e '.mcpServers["lean-lsp"]' .mcp.json &>/dev/null; then
+        log_ok "lean-lsp-mcp configured"
+    else
+        log_warn "lean-lsp-mcp configuration may have failed"
+        return 1
+    fi
+}
+
+# Main
+main() {
+    local check_only=0
+
+    # Parse args
+    for arg in "$@"; do
+        case "$arg" in
+            --check) check_only=1 ;;
+            --help|-h)
+                echo "Usage: $0 [--check]"
+                echo "  --check  Check what's installed without changes"
+                exit 0
+                ;;
+        esac
+    done
+
+    export CHECK_ONLY="$check_only"
+
+    # Detect environment
+    local env
+    env=$(detect_env)
+    echo "Environment: $env"
+    echo ""
+
+    # Track failures
+    local failed=0
+
+    # Install tools
+    ensure_uv || ((++failed))
+    ensure_ruff || ((++failed))
+    ensure_precommit "$env" || ((++failed))
+    ensure_jq || ((++failed))
+    ensure_shellcheck || ((++failed))
+    ensure_ripgrep || ((++failed))
+    ensure_elan || ((++failed))
+    ensure_lean_project || ((++failed))
+    ensure_vscode_lean "$env" || ((++failed))
+    ensure_lean_lsp_mcp "$env" || ((++failed))
+
+    echo ""
+    if [[ $failed -gt 0 ]]; then
+        if [[ "$check_only" == "1" ]]; then
+            log_warn "$failed tool(s) not installed"
+        else
+            log_err "$failed tool(s) failed to install"
+        fi
+        return 1
+    else
+        log_ok "All tools ready"
+    fi
+}
+
+
+# Install Claude Code
+echo "Installing Claude Code..."
+if command -v claude > /dev/null 2>&1; then
+    CLAUDE_VERSION=$(claude --version 2>&1 | head -1)
+    log_ok "Claude Code already installed ($CLAUDE_VERSION)"
+else
+    curl -fsSL https://claude.ai/install.sh | bash
+    # Add to PATH for current session
+    export PATH="$HOME/.local/bin:$PATH"
+
+    # Verify installation succeeded
+    if command -v claude > /dev/null 2>&1; then
+        CLAUDE_VERSION=$(claude --version 2>&1 | head -1)
+        log_ok "Claude Code installed ($CLAUDE_VERSION)"
+    else
+        log_warn "Claude Code installation may have failed - command not found"
+    fi
+fi
+echo ""
+
+main "$@"
