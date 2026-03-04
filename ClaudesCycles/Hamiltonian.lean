@@ -43,7 +43,6 @@ theorem dirCycle0_eq_d0_iff (v : V m) :
   · intro h
     split_ifs at h with hs hj hsm hi
     · exact ⟨hs, hj⟩
-    all_goals simp_all [Dir.noConfusion]
   · rintro ⟨hs, hj⟩
     simp [hs, hj]
 
@@ -53,10 +52,21 @@ Starting from any vertex with fiber s, exactly m steps bring the fiber
 back to s (since each step adds 1 mod m to the fiber).
 -/
 
+/-- After n steps, the fiber advances by n. -/
+theorem fiber_iterate (c : CycleIndex) (v : V m) (n : ℕ) :
+    fiber ((cycleStep c)^[n] v) = fiber v + (n : ZMod m) := by
+  induction n with
+  | zero => simp
+  | succ n ih =>
+    rw [Function.iterate_succ_apply', fiber_cycleStep, ih]
+    push_cast
+    ring
+
 /-- After m steps along any cycle, the fiber returns to its original value. -/
 theorem fiber_iterate_m (c : CycleIndex) (v : V m) :
     fiber ((cycleStep c)^[m] v) = fiber v := by
-  sorry
+  rw [fiber_iterate]
+  simp
 
 /-! ## Within-block trajectory for cycle 0
 
@@ -66,10 +76,14 @@ common difference -2 at fiber-0 positions. Since gcd(2, m) = 1 for odd m,
 this visits all m values of j.
 -/
 
+omit [NeZero m] in
 /-- The -2 shift is a unit in ZMod m when m is odd. -/
-theorem neg_two_isUnit (hm : 2 < m) (hm_odd : Odd m) :
+theorem neg_two_isUnit (hm_odd : Odd m) :
     IsUnit (-2 : ZMod m) := by
-  sorry
+  apply IsUnit.neg
+  rw [show (2 : ZMod m) = ((2 : ℕ) : ZMod m) from by push_cast; ring]
+  rw [ZMod.isUnit_iff_coprime]
+  exact hm_odd.coprime_two_left
 
 /-! ## Block transition: after m² steps, move to next block -/
 
