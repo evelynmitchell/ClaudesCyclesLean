@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# SOPS Bootstrap Script
+# LEAN SOPS Bootstrap Script
 # Detects environment and installs development tools idempotently.
 #
 # Usage:

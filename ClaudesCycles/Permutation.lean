@@ -26,7 +26,7 @@ theorem dirMap_injective (v : V m) :
   intro c₁ c₂ h
   unfold dirMap dirCycle0 dirCycle1 dirCycle2 at h
   cases c₁ <;> cases c₂ <;> simp_all
-  all_goals split_ifs at h <;> simp_all (config := { decide := true }) [Dir.noConfusion]
+  all_goals split_ifs at h
 
 /-- Corollary: the three directions assigned at any vertex are pairwise distinct. -/
 theorem dirMap_ne_of_ne (v : V m) {c₁ c₂ : CycleIndex} (hc : c₁ ≠ c₂) :
