@@ -230,7 +230,7 @@ ensure_lean_project() {
     log_ok "lake ($(lake --version 2>&1 | head -1))"
 
     if [[ "${CHECK_ONLY:-}" == "1" ]]; then
-        if [[ -d "ConnesLean/.lake" ]]; then
+        if [[ -d ".lake" ]]; then
             log_ok "Lean project exists"
         else
             log_warn "Lean project not built"
@@ -239,14 +239,14 @@ ensure_lean_project() {
         return 0
     fi
 
-    if [[ -d "ConnesLean" ]]; then
+    if [[ -f "lakefile.toml" ]] || [[ -f "lakefile.lean" ]]; then
         log_info "Fetching Mathlib cache..."
-        (cd ConnesLean && lake exe cache get 2>&1 | tee -a /tmp/lake_cache.log | tail -1)
-        log_info "Building ConnesLean..."
-        (cd ConnesLean && lake build ConnesLean 2>&1 | tee -a /tmp/lake_build.log | tail -5)
+        lake exe cache get 2>&1 | tee -a /tmp/lake_cache.log | tail -1
+        log_info "Building project..."
+        lake build 2>&1 | tee -a /tmp/lake_build.log | tail -5
         log_ok "Lean project built"
     else
-        log_warn "ConnesLean directory not found"
+        log_warn "No lakefile found in current directory"
         return 1
     fi
 }

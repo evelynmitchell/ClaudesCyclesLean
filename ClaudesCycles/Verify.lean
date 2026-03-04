@@ -10,10 +10,14 @@ import Mathlib.Data.Fintype.Basic
 
 namespace ClaudesCycles
 
-/-! ## Decidable instances for verification -/
+/-! ## Decidable instances and cardinality -/
 
 instance {m : ℕ} [NeZero m] : DecidableEq (V m) :=
   inferInstanceAs (DecidableEq (ZMod m × ZMod m × ZMod m))
+
+/-- The vertex set has exactly m³ elements. -/
+theorem card_V (m : ℕ) [NeZero m] : Fintype.card (V m) = m ^ 3 := by
+  simp [V, Fintype.card_prod, ZMod.card, pow_succ, pow_zero, mul_comm]
 
 /-- Check that iterating `cycleStep c` from `v` for `n` steps returns to `v`. -/
 def returnsInSteps {m : ℕ} [NeZero m] (c : CycleIndex) (v : V m) (n : ℕ) : Bool :=
@@ -24,7 +28,9 @@ def orbitSize {m : ℕ} [NeZero m] [Fintype (V m)] (c : CycleIndex) (v : V m) (n
   let orbit := (List.range n).map (fun k => (cycleStep c)^[k] v)
   orbit.Nodup && orbit.length == n
 
-/-- Combined check: the orbit from `v` has size exactly `m³` and returns to start. -/
+/-- Combined check: the orbit from `v` has size exactly `m³` and returns to start.
+    Since `Fintype.card (V m) = m³` (see `card_V`), visiting m³ distinct vertices
+    means the cycle is Hamiltonian. -/
 def isHamiltonianFrom {m : ℕ} [NeZero m] [Fintype (V m)]
     (c : CycleIndex) (v : V m) : Bool :=
   let n := m ^ 3
