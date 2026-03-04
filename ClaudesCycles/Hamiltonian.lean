@@ -38,16 +38,12 @@ theorem fiber_cycle0Entry (i : ZMod m) :
 /-- Cycle 0 bumps the first coordinate iff s = 0 and j = -1. -/
 theorem dirCycle0_eq_d0_iff (v : V m) :
     dirCycle0 v = .d0 ↔ fiber v = 0 ∧ v.2.1 = -1 := by
-  unfold dirCycle0
+  simp only [dirCycle0]
   constructor
   · intro h
-    split_ifs at h with hs hj hsm hi him
+    split_ifs at h with hs hj hsm hi
     · exact ⟨hs, hj⟩
-    · exact absurd h Dir.noConfusion
-    · exact absurd h Dir.noConfusion
-    · exact absurd h Dir.noConfusion
-    · exact absurd h Dir.noConfusion
-    · exact absurd h Dir.noConfusion
+    all_goals simp_all [Dir.noConfusion]
   · rintro ⟨hs, hj⟩
     simp [hs, hj]
 
@@ -60,9 +56,7 @@ back to s (since each step adds 1 mod m to the fiber).
 /-- After m steps along any cycle, the fiber returns to its original value. -/
 theorem fiber_iterate_m (c : CycleIndex) (v : V m) :
     fiber ((cycleStep c)^[m] v) = fiber v := by
-  induction m with
-  | zero => exact absurd rfl (NeZero.ne 0)
-  | succ n => sorry
+  sorry
 
 /-! ## Within-block trajectory for cycle 0
 
@@ -75,7 +69,6 @@ this visits all m values of j.
 /-- The -2 shift is a unit in ZMod m when m is odd. -/
 theorem neg_two_isUnit (hm : 2 < m) (hm_odd : Odd m) :
     IsUnit (-2 : ZMod m) := by
-  rw [ZMod.isUnit_prime_iff_not_dvd (by omega : Nat.Prime 2 → False) |>.mp |>.symm |>.mp]
   sorry
 
 /-! ## Block transition: after m² steps, move to next block -/

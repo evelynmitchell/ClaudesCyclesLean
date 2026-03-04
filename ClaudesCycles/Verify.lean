@@ -50,18 +50,10 @@ example : cycleIsHamiltonian 5 .c0 = true := by native_decide
 example : cycleIsHamiltonian 5 .c1 = true := by native_decide
 example : cycleIsHamiltonian 5 .c2 = true := by native_decide
 
-/-! ## Permutation property check
+/-! ## Permutation property
 
-At every vertex, the three cycles assign three distinct directions. -/
-
-/-- Check that at every vertex, the three directions are pairwise distinct. -/
-def allDirectionsDistinct (m : ℕ) [NeZero m] [Fintype (V m)] : Bool :=
-  (Finset.univ : Finset (V m)).forall fun v =>
-    dirMap .c0 v ≠ dirMap .c1 v &&
-    dirMap .c0 v ≠ dirMap .c2 v &&
-    dirMap .c1 v ≠ dirMap .c2 v
-
-example : allDirectionsDistinct 3 = true := by native_decide
-example : allDirectionsDistinct 5 = true := by native_decide
+The permutation property (three directions are always distinct at each vertex)
+is proved in `Permutation.lean` as `dirMap_injective`, which holds for all m.
+No computational check needed. -/
 
 end ClaudesCycles

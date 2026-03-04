@@ -22,7 +22,7 @@ inductive Dir : Type where
   deriving DecidableEq, Repr
 
 instance : Fintype Dir :=
-  ⟨⟨[.d0, .d1, .d2], by simp⟩, fun d => by cases d <;> simp⟩
+  ⟨⟨[Dir.d0, Dir.d1, Dir.d2], by decide⟩, fun d => by cases d <;> decide⟩
 
 /-- The three cycle indices. -/
 inductive CycleIndex : Type where
@@ -32,7 +32,8 @@ inductive CycleIndex : Type where
   deriving DecidableEq, Repr
 
 instance : Fintype CycleIndex :=
-  ⟨⟨[.c0, .c1, .c2], by simp⟩, fun c => by cases c <;> simp⟩
+  ⟨⟨[CycleIndex.c0, CycleIndex.c1, CycleIndex.c2], by decide⟩,
+   fun c => by cases c <;> decide⟩
 
 /-! ## Core operations -/
 
@@ -68,10 +69,8 @@ theorem bump_d2 {m : ℕ} [NeZero m] (v : V m) :
 
 /-- 1 ≠ 0 in ZMod m when m > 1. -/
 theorem one_ne_zero_of_one_lt {m : ℕ} [NeZero m] (hm : 1 < m) : (1 : ZMod m) ≠ 0 := by
-  intro h
-  have := ZMod.val_one hm
-  rw [ZMod.val_eq_zero] at h
-  simp [h] at this
+  haveI : Fact (1 < m) := ⟨hm⟩
+  exact one_ne_zero
 
 /-- Bumping in different directions gives different results (when m ≥ 2). -/
 theorem bump_injective_dir {m : ℕ} [NeZero m] (hm : 1 < m) (v : V m) :
