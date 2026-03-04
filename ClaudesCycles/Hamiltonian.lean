@@ -7,7 +7,6 @@ Main result: for odd m ≥ 3, each of the three cycles visits all m³ vertices.
 -/
 import ClaudesCycles.DirectionMap
 import ClaudesCycles.Permutation
-import Mathlib.Data.Nat.Prime.Basic
 import Mathlib.Data.ZMod.Basic
 import Mathlib.GroupTheory.Perm.Cycle.Basic
 import Mathlib.Data.Fintype.Basic
