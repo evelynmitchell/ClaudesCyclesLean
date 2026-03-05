@@ -64,4 +64,53 @@ theorem c0_step_mid_ieq (j k : ZMod m)
   simp only [cycleStep_def, dirMap_c0, dirCycle0, fiber] at *
   split_ifs <;> simp_all [bump]
 
+/-! ## ZMod helper lemmas for fiber arithmetic
+
+These lemmas support the intermediate run and block transition proofs.
+-/
+
+omit [NeZero m] in
+theorem natCast_m_sub_one (hm : 1 ≤ m) : ((m - 1 : ℕ) : ZMod m) = -1 := by
+  have h : ((m - 1 : ℕ) : ZMod m) + 1 = 0 := by
+    have h1 : m - 1 + 1 = m := Nat.sub_add_cancel hm
+    exact_mod_cast show ((m - 1 + 1 : ℕ) : ZMod m) = 0 by rw [h1]; exact ZMod.natCast_self m
+  exact eq_neg_of_add_eq_zero_left h
+
+omit [NeZero m] in
+theorem natCast_m_sub_two (hm : 2 ≤ m) : ((m - 2 : ℕ) : ZMod m) = -2 := by
+  have h : ((m - 2 : ℕ) : ZMod m) + 2 = 0 := by
+    have h1 : m - 2 + 2 = m := Nat.sub_add_cancel hm
+    exact_mod_cast show ((m - 2 + 2 : ℕ) : ZMod m) = 0 by rw [h1]; exact ZMod.natCast_self m
+  exact eq_neg_of_add_eq_zero_left h
+
+omit [NeZero m] in
+theorem one_ne_neg_one [Fact (2 < m)] : (1 : ZMod m) ≠ -1 :=
+  (ZMod.neg_one_ne_one (n := m)).symm
+
+omit [NeZero m] in
+theorem natCast_ne_zero (hn : n < m - 1) : ((1 + n : ℕ) : ZMod m) ≠ 0 := by
+  intro h
+  rw [ZMod.natCast_eq_zero_iff] at h
+  have := Nat.le_of_dvd (by omega) h
+  omega
+
+theorem natCast_ne_neg_one (hm : 2 ≤ m) (hn : n < m - 2) :
+    ((1 + n : ℕ) : ZMod m) ≠ -1 := by
+  obtain ⟨m', rfl⟩ : ∃ k, m = k + 1 := ⟨m - 1, by omega⟩
+  intro h
+  have hlt : (1 + n : ℕ) < m' + 1 := by omega
+  have hv : ((1 + n : ℕ) : ZMod (m' + 1)).val = 1 + n := ZMod.val_natCast_of_lt hlt
+  have hv2 : ((-1 : ZMod (m' + 1))).val = m' := ZMod.val_neg_one m'
+  have := congr_arg ZMod.val h
+  rw [hv, hv2] at this
+  omega
+
+/-! ## Tests -/
+
+example : ((4 : ℕ) : ZMod 5) = -1 := natCast_m_sub_one (m := 5) (by omega)
+example : ((3 : ℕ) : ZMod 5) = -2 := natCast_m_sub_two (m := 5) (by omega)
+example : (1 : ZMod 5) ≠ -1 := @one_ne_neg_one 5 ⟨by omega⟩
+example : ((1 + 0 : ℕ) : ZMod 5) ≠ 0 := natCast_ne_zero (m := 5) (by omega)
+example : ((1 + 1 : ℕ) : ZMod 5) ≠ -1 := natCast_ne_neg_one (m := 5) (by omega) (by omega)
+
 end ClaudesCycles
