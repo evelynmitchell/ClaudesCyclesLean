@@ -88,13 +88,14 @@ theorem one_ne_neg_one [Fact (2 < m)] : (1 : ZMod m) ≠ -1 :=
   (ZMod.neg_one_ne_one (n := m)).symm
 
 omit [NeZero m] in
-theorem natCast_ne_zero (hn : n < m - 1) : ((1 + n : ℕ) : ZMod m) ≠ 0 := by
+theorem natCast_ne_zero {n : ℕ} (hn : n < m - 1) : ((1 + n : ℕ) : ZMod m) ≠ 0 := by
   intro h
   rw [ZMod.natCast_eq_zero_iff] at h
   have := Nat.le_of_dvd (by omega) h
   omega
 
-theorem natCast_ne_neg_one (hm : 2 ≤ m) (hn : n < m - 2) :
+omit [NeZero m] in
+theorem natCast_ne_neg_one {n : ℕ} (hm : 2 ≤ m) (hn : n < m - 2) :
     ((1 + n : ℕ) : ZMod m) ≠ -1 := by
   obtain ⟨m', rfl⟩ : ∃ k, m = k + 1 := ⟨m - 1, by omega⟩
   intro h
