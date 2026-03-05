@@ -1,6 +1,6 @@
 /-
-Copyright (c) 2026 Claude's Cycles Formalization Project. All rights reserved.
-Released under Apache 2.0 license as described in the file LICENSE.
+Copyright (c) 2026 Claude's Cycles Formalization Project.
+Licensed under the Apache License, Version 2.0, as described in the file LICENSE.
 
 Step-level lemmas for cycle 0's direction table.
 Each lemma characterizes `cycleStep .c0` for one row of Knuth's table.
@@ -15,6 +15,10 @@ variable {m : ℕ} [NeZero m]
 
 The direction table for cycle 0 has six rows, determined by the fiber
 value `s = i + j + k` and a secondary coordinate condition.
+
+**Naming convention:** `c0_step_<fiber>_<coord>` where
+- `f0` / `fn1` / `mid` = fiber is 0 / -1 / other
+- `jn1` / `jne` / `ine` / `ieq` = secondary coordinate condition
 -/
 
 /-- Row 1: fiber = 0, j = -1 → bump i. -/
