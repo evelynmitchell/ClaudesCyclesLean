@@ -199,6 +199,86 @@ theorem cycle0_period_entry (hm : 2 < m) (hm_odd : Odd m) (i : ZMod m) :
 example : (cycleStep .c0)^[3 ^ 3] (cycle0Entry (0 : ZMod 3)) = cycle0Entry 0 :=
   cycle0_period_entry (by omega) ⟨1, by omega⟩ 0
 
+/-! ## No early return: orbit doesn't hit entry points within a block -/
+
+/-- Within a block (steps 1 through m²-1 from an entry point), the orbit never
+    lands on any entry point. -/
+theorem c0_not_entry_within_block (hm : 2 < m) (hm_odd : Odd m)
+    (i j : ZMod m) (r : ℕ) (hr : 0 < r) (hr' : r < m ^ 2) :
+    (cycleStep .c0)^[r] (cycle0Entry i) ≠ cycle0Entry j := by
+  intro heq
+  have hfib := congr_arg fiber heq
+  rw [fiber_iterate, fiber_cycle0Entry, fiber_cycle0Entry] at hfib
+  have hr_zero : (r : ZMod m) = 0 := by linear_combination hfib
+  have hdvd : m ∣ r := by
+    rwa [ZMod.natCast_eq_zero_iff] at hr_zero
+  obtain ⟨t, ht_eq⟩ := hdvd
+  have hrw : r = t * m := by rw [ht_eq, Nat.mul_comm]
+  have ht1 : 1 ≤ t := Nat.pos_of_mul_pos_left (ht_eq ▸ hr)
+  have ht2 : t ≤ m - 1 := by
+    have : m * t < m * m := by
+      calc m * t = r := ht_eq.symm
+        _ < m ^ 2 := hr'
+        _ = m * m := Nat.pow_two m
+    have := Nat.lt_of_mul_lt_mul_left this; omega
+  rw [hrw] at heq
+  unfold cycle0Entry at heq
+  by_cases hi0 : i = 0
+  · subst hi0
+    rw [c0_iter_i_eq_zero (-1) (2 - 0) hm (by simp [fiber]; ring) t ht2
+        (fun t' ht' => ?_)] at heq
+    · simp only [Prod.mk.injEq] at heq
+      obtain ⟨_, hj_eq, _⟩ := heq
+      have : (t : ZMod m) * ((m - 2 : ℕ) : ZMod m) = 0 := by linear_combination hj_eq
+      rw [natCast_m_sub_two (by omega)] at this
+      have : (-2 : ZMod m) * (t : ZMod m) = 0 := by linear_combination this
+      have ht_zero : (t : ZMod m) = 0 := (neg_two_isUnit hm_odd).mul_right_eq_zero.mp this
+      exact absurd (Nat.le_of_dvd (by omega) ((ZMod.natCast_eq_zero_iff t m).mp ht_zero))
+        (by omega)
+    · rw [natCast_m_sub_two (by omega)]
+      intro h
+      have h1 : (-2 : ZMod m) * ((t' : ZMod m) + 1) = 0 := by linear_combination h
+      have h2 : (t' : ZMod m) + 1 = 0 := (neg_two_isUnit hm_odd).mul_right_eq_zero.mp h1
+      rw [show (t' : ZMod m) + 1 = ((t' + 1 : ℕ) : ZMod m) from by push_cast; ring] at h2
+      exact absurd (Nat.le_of_dvd (by omega) ((ZMod.natCast_eq_zero_iff _ m).mp h2))
+        (by omega)
+  · by_cases hi1 : i = -1
+    · subst hi1
+      rw [c0_iter_i_eq_neg_one (-1) (2 - -1) hm (by simp [fiber]; ring) t ht2
+          (fun t' ht' => ?_)] at heq
+      · simp only [Prod.mk.injEq] at heq
+        obtain ⟨_, hj_eq, _⟩ := heq
+        have ht_zero : (t : ZMod m) = 0 := by linear_combination hj_eq
+        exact absurd (Nat.le_of_dvd (by omega)
+          ((ZMod.natCast_eq_zero_iff t m).mp ht_zero)) (by omega)
+      · intro h
+        have h1 : (t' : ZMod m) + 1 = 0 := by linear_combination h
+        rw [show (t' : ZMod m) + 1 = ((t' + 1 : ℕ) : ZMod m) from by push_cast; ring] at h1
+        exact absurd (Nat.le_of_dvd (by omega)
+          ((ZMod.natCast_eq_zero_iff _ m).mp h1)) (by omega)
+    · rw [c0_iter_generic i (-1) (2 - i) hm (by simp [fiber]; ring) hi0 hi1 t ht2
+          (fun t' ht' => ?_)] at heq
+      · simp only [Prod.mk.injEq] at heq
+        obtain ⟨_, hj_eq, _⟩ := heq
+        have : (t : ZMod m) * ((m - 1 : ℕ) : ZMod m) = 0 := by linear_combination hj_eq
+        rw [natCast_m_sub_one (by omega)] at this
+        have ht_zero : (t : ZMod m) = 0 := by linear_combination -this
+        exact absurd (Nat.le_of_dvd (by omega)
+          ((ZMod.natCast_eq_zero_iff t m).mp ht_zero)) (by omega)
+      · rw [natCast_m_sub_one (by omega)]
+        intro h
+        have h1 : (t' : ZMod m) + 1 = 0 := by linear_combination -h
+        rw [show (t' : ZMod m) + 1 = ((t' + 1 : ℕ) : ZMod m) from by push_cast; ring] at h1
+        exact absurd (Nat.le_of_dvd (by omega)
+          ((ZMod.natCast_eq_zero_iff _ m).mp h1)) (by omega)
+
+-- No early return tests: m = 3
+example : (cycleStep .c0)^[1] (cycle0Entry (0 : ZMod 3)) ≠ cycle0Entry 0 :=
+  c0_not_entry_within_block (by omega) ⟨1, by omega⟩ 0 0 1 (by omega) (by omega)
+
+example : (cycleStep .c0)^[4] (cycle0Entry (1 : ZMod 3)) ≠ cycle0Entry 2 :=
+  c0_not_entry_within_block (by omega) ⟨1, by omega⟩ 1 2 4 (by omega) (by omega)
+
 /-! ## Main Hamiltonian theorem for cycle 0 -/
 
 /-- Cycle 0 returns to start after m³ steps. -/
