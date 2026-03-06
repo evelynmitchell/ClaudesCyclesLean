@@ -7,6 +7,7 @@ Main result: for odd m ≥ 3, each of the three cycles visits all m³ vertices.
 -/
 import ClaudesCycles.DirectionMap
 import ClaudesCycles.Permutation
+import ClaudesCycles.BlockAnalysis
 import Mathlib.Data.ZMod.Basic
 import Mathlib.GroupTheory.Perm.Cycle.Basic
 import Mathlib.Data.Fintype.Basic
@@ -90,7 +91,89 @@ theorem neg_two_isUnit (hm_odd : Odd m) :
 /-- After m² steps of cycle 0 from entry i, we reach entry (i+1). -/
 theorem cycle0_block_transition (hm : 2 < m) (hm_odd : Odd m) (i : ZMod m) :
     (cycleStep .c0)^[m ^ 2] (cycle0Entry i) = cycle0Entry (i + 1) := by
-  sorry
+  -- Decompose m² = (m-1)·m + m
+  have hsplit : (cycleStep .c0)^[m ^ 2] (cycle0Entry i) =
+      (cycleStep .c0)^[m] ((cycleStep .c0)^[(m - 1) * m] (cycle0Entry i)) := by
+    rw [← Function.iterate_add_apply]; congr 1
+    have : m ^ 2 = (m - 1) * m + m := by
+      rw [Nat.sub_one_mul, Nat.sub_add_cancel (Nat.le_mul_of_pos_right m (by omega))]
+      ring
+    omega
+  rw [hsplit]
+  unfold cycle0Entry
+  by_cases hi0 : i = 0
+  · -- Case B: i = 0
+    subst hi0
+    rw [c0_iter_i_eq_zero (-1) (2 - 0) hm (by simp only [fiber]; ring) (m - 1) le_rfl ?hj_safe]
+    · have hfib : fiber ((0 : ZMod m), -1 + ↑(m - 1) * ((m - 2 : ℕ) : ZMod m),
+          2 - 0 + 2 * ↑(m - 1)) = 1 := by
+        simp only [fiber]; rw [natCast_m_sub_one (by omega), natCast_m_sub_two (by omega)]; ring
+      have hj_bump : (-1 : ZMod m) + ↑(m - 1) * ((m - 2 : ℕ) : ZMod m) +
+          ((m - 2 : ℕ) : ZMod m) = -1 := by
+        rw [natCast_m_sub_one (by omega), natCast_m_sub_two (by omega)]; ring
+      rw [c0_fiber_cycle_i_eq_zero_bump _ _ hm hfib hj_bump]
+      simp only [Prod.mk.injEq]; refine ⟨by ring, trivial, ?_⟩
+      rw [natCast_m_sub_one (show 1 ≤ m by omega)]; ring
+    case hj_safe =>
+      intro t ht
+      rw [natCast_m_sub_two (by omega)]
+      intro h
+      have h1 : (-2 : ZMod m) * ((t : ZMod m) + 1) = 0 := by linear_combination h
+      have hu : IsUnit (-2 : ZMod m) := neg_two_isUnit hm_odd
+      have h2 : (t : ZMod m) + 1 = 0 := hu.mul_right_eq_zero.mp h1
+      rw [show (t : ZMod m) + 1 = ((t + 1 : ℕ) : ZMod m) from by push_cast; ring] at h2
+      rw [ZMod.natCast_eq_zero_iff] at h2
+      exact absurd (Nat.le_of_dvd (by omega) h2) (by omega)
+  · by_cases hi1 : i = -1
+    · -- Case C: i = -1
+      subst hi1
+      rw [c0_iter_i_eq_neg_one (-1) (2 - -1) hm (by simp only [fiber]; ring)
+          (m - 1) le_rfl ?hj_safe]
+      · have hfib : fiber ((-1 : ZMod m), -1 + ↑(m - 1),
+            2 - -1 + ↑(m - 1) * ((m - 1 : ℕ) : ZMod m)) = 1 := by
+          simp only [fiber]; rw [natCast_m_sub_one (by omega)]; ring
+        have hj_bump : (-1 : ZMod m) + ↑(m - 1) + 1 = -1 := by
+          rw [natCast_m_sub_one (by omega)]; ring
+        rw [c0_fiber_cycle_i_eq_neg_one_bump _ _ hm hfib hj_bump]
+        simp only [Prod.mk.injEq]; refine ⟨by ring, trivial, ?_⟩
+        rw [natCast_m_sub_one (show 1 ≤ m by omega), natCast_m_sub_two (show 2 ≤ m by omega)]
+        ring
+      case hj_safe =>
+        intro t ht h
+        have h1 : (t : ZMod m) + 1 = 0 := by linear_combination h
+        rw [show (t : ZMod m) + 1 = ((t + 1 : ℕ) : ZMod m) from by push_cast; ring] at h1
+        rw [ZMod.natCast_eq_zero_iff] at h1
+        exact absurd (Nat.le_of_dvd (by omega) h1) (by omega)
+    · -- Case A: generic i ≠ 0, i ≠ -1
+      rw [c0_iter_generic i (-1) (2 - i) hm (by simp only [fiber]; ring) hi0 hi1
+          (m - 1) le_rfl ?hj_safe]
+      · have hfib : fiber (i, -1 + ↑(m - 1) * ((m - 1 : ℕ) : ZMod m),
+            2 - i + ↑(m - 1)) = 1 := by
+          simp only [fiber]; rw [natCast_m_sub_one (by omega)]; ring
+        have hj_bump : -1 + ↑(m - 1) * ((m - 1 : ℕ) : ZMod m) +
+            ((m - 1 : ℕ) : ZMod m) = -1 := by
+          rw [natCast_m_sub_one (by omega)]; ring
+        rw [c0_fiber_cycle_generic_bump _ _ _ hm hfib hi0 hi1 hj_bump]
+        simp only [Prod.mk.injEq, true_and]
+        rw [natCast_m_sub_one (by omega)]; ring
+      case hj_safe =>
+        intro t ht
+        rw [natCast_m_sub_one (by omega)]
+        intro h
+        have h1 : (t : ZMod m) + 1 = 0 := by linear_combination -h
+        rw [show (t : ZMod m) + 1 = ((t + 1 : ℕ) : ZMod m) from by push_cast; ring] at h1
+        rw [ZMod.natCast_eq_zero_iff] at h1
+        exact absurd (Nat.le_of_dvd (by omega) h1) (by omega)
+
+-- Block transition tests: m = 3
+example : (cycleStep .c0)^[3 ^ 2] (cycle0Entry (0 : ZMod 3)) = cycle0Entry (0 + 1) :=
+  cycle0_block_transition (by omega) ⟨1, by omega⟩ 0
+
+example : (cycleStep .c0)^[3 ^ 2] (cycle0Entry (1 : ZMod 3)) = cycle0Entry (1 + 1) :=
+  cycle0_block_transition (by omega) ⟨1, by omega⟩ 1
+
+example : (cycleStep .c0)^[3 ^ 2] (cycle0Entry (2 : ZMod 3)) = cycle0Entry (2 + 1) :=
+  cycle0_block_transition (by omega) ⟨1, by omega⟩ 2
 
 /-! ## Main Hamiltonian theorem for cycle 0 -/
 
