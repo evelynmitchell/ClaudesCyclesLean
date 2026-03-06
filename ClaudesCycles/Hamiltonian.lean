@@ -119,9 +119,7 @@ theorem cycle0_block_transition (hm : 2 < m) (hm_odd : Odd m) (i : ZMod m) :
       rw [natCast_m_sub_two (by omega)]
       intro h
       have h1 : (-2 : ZMod m) * ((t : ZMod m) + 1) = 0 := by linear_combination h
-      have hu : IsUnit ((-2 : ZMod m)) := IsUnit.neg (by
-        rw [show (2 : ZMod m) = ((2 : ℕ) : ZMod m) from by push_cast; ring]
-        rw [ZMod.isUnit_iff_coprime]; exact hm_odd.coprime_two_left)
+      have hu : IsUnit (-2 : ZMod m) := neg_two_isUnit hm_odd
       have h2 : (t : ZMod m) + 1 = 0 := hu.mul_right_eq_zero.mp h1
       rw [show (t : ZMod m) + 1 = ((t + 1 : ℕ) : ZMod m) from by push_cast; ring] at h2
       rw [ZMod.natCast_eq_zero_iff] at h2
