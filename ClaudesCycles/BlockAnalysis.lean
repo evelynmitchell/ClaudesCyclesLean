@@ -262,6 +262,116 @@ example : (cycleStep .c0)^[3] ((-1 : ZMod 5), (0 : ZMod 5), (2 : ZMod 5)) =
   c0_intermediate_run_bump_k (m := 5) _ _
     (by omega) (by simp [fiber]; ring) 3 (by omega)
 
+/-! ## Iterated fiber cycle lemmas for cycle 0
+
+After n complete fiber cycles (n·m steps), j and k follow arithmetic
+progressions.  The `hj_safe` hypothesis ensures no i-bump occurs at
+fiber 0 during any of the n cycles.
+
+Note: the `hn : n ≤ m - 1` bound is not used in these proofs directly,
+but is included so that downstream consumers (block transition, #8) can
+discharge `hj_safe` via `hn` without needing to re-state the bound.
+-/
+
+/-- Case A iterated: generic i. Each cycle shifts j by (m-1) and k by 1. -/
+theorem c0_iter_generic (i j k : ZMod m) (hm : 2 < m)
+    (hfib : fiber (i, j, k) = 1) (hi0 : i ≠ 0) (hi1 : i ≠ -1)
+    (n : ℕ) (hn : n ≤ m - 1)
+    (hj_safe : ∀ t : ℕ, t < n →
+      j + (t : ZMod m) * ((m - 1 : ℕ) : ZMod m) + ((m - 1 : ℕ) : ZMod m) ≠ -1) :
+    (cycleStep .c0)^[n * m] (i, j, k) =
+      (i, j + (n : ZMod m) * ((m - 1 : ℕ) : ZMod m), k + (n : ZMod m)) := by
+  induction n with
+  | zero => simp
+  | succ n ih =>
+    have hn' : n ≤ m - 1 := by omega
+    have hsplit : (cycleStep .c0)^[(n + 1) * m] (i, j, k) =
+        (cycleStep .c0)^[m] ((cycleStep .c0)^[n * m] (i, j, k)) := by
+      rw [← Function.iterate_add_apply]; congr 1; ring
+    rw [hsplit, ih hn' (fun t ht => hj_safe t (by omega))]
+    have hfib' : fiber (i, j + (n : ZMod m) * ((m - 1 : ℕ) : ZMod m), k + (n : ZMod m)) = 1 := by
+      rw [fiber_add_k, fiber_add_j, hfib, natCast_m_sub_one (by omega)]; ring
+    rw [c0_fiber_cycle_generic _ _ _ hm hfib' hi0 hi1 (hj_safe n (by omega))]
+    simp only [Prod.mk.injEq]; exact ⟨trivial, by push_cast; ring, by push_cast; ring⟩
+
+/-- Case B iterated: i = 0. Each cycle shifts j by (m-2) and k by 2. -/
+theorem c0_iter_i_eq_zero (j k : ZMod m) (hm : 2 < m)
+    (hfib : fiber ((0 : ZMod m), j, k) = 1)
+    (n : ℕ) (hn : n ≤ m - 1)
+    (hj_safe : ∀ t : ℕ, t < n →
+      j + (t : ZMod m) * ((m - 2 : ℕ) : ZMod m) + ((m - 2 : ℕ) : ZMod m) ≠ -1) :
+    (cycleStep .c0)^[n * m] ((0 : ZMod m), j, k) =
+      (0, j + (n : ZMod m) * ((m - 2 : ℕ) : ZMod m), k + 2 * (n : ZMod m)) := by
+  induction n with
+  | zero => simp
+  | succ n ih =>
+    have hn' : n ≤ m - 1 := by omega
+    have hsplit : (cycleStep .c0)^[(n + 1) * m] ((0 : ZMod m), j, k) =
+        (cycleStep .c0)^[m] ((cycleStep .c0)^[n * m] ((0 : ZMod m), j, k)) := by
+      rw [← Function.iterate_add_apply]; congr 1; ring
+    rw [hsplit, ih hn' (fun t ht => hj_safe t (by omega))]
+    have hfib' : fiber ((0 : ZMod m), j + (n : ZMod m) * ((m - 2 : ℕ) : ZMod m),
+        k + 2 * (n : ZMod m)) = 1 := by
+      rw [fiber_add_k, fiber_add_j, hfib, natCast_m_sub_two (by omega)]; ring
+    have hj' : j + (↑n * ((m - 2 : ℕ) : ZMod m)) ≠ 1 := by
+      intro h
+      exact hj_safe n (by omega) (by
+        rw [natCast_m_sub_two (by omega)] at h ⊢; linear_combination h)
+    rw [c0_fiber_cycle_i_eq_zero _ _ hm hfib' hj']
+    simp only [Prod.mk.injEq]; exact ⟨trivial, by push_cast; ring, by push_cast; ring⟩
+
+/-- Case C iterated: i = -1. Each cycle shifts j by 1 and k by (m-1). -/
+theorem c0_iter_i_eq_neg_one (j k : ZMod m) (hm : 2 < m)
+    (hfib : fiber ((-1 : ZMod m), j, k) = 1)
+    (n : ℕ) (hn : n ≤ m - 1)
+    (hj_safe : ∀ t : ℕ, t < n →
+      j + (t : ZMod m) + 1 ≠ -1) :
+    (cycleStep .c0)^[n * m] ((-1 : ZMod m), j, k) =
+      (-1, j + (n : ZMod m), k + (n : ZMod m) * ((m - 1 : ℕ) : ZMod m)) := by
+  induction n with
+  | zero => simp
+  | succ n ih =>
+    have hn' : n ≤ m - 1 := by omega
+    have hsplit : (cycleStep .c0)^[(n + 1) * m] ((-1 : ZMod m), j, k) =
+        (cycleStep .c0)^[m] ((cycleStep .c0)^[n * m] ((-1 : ZMod m), j, k)) := by
+      rw [← Function.iterate_add_apply]; congr 1; ring
+    rw [hsplit, ih hn' (fun t ht => hj_safe t (by omega))]
+    have hfib' : fiber ((-1 : ZMod m), j + (n : ZMod m),
+        k + (n : ZMod m) * ((m - 1 : ℕ) : ZMod m)) = 1 := by
+      rw [fiber_add_k, fiber_add_j, hfib, natCast_m_sub_one (by omega)]; ring
+    have hj' : j + (n : ZMod m) ≠ -2 := by
+      intro h
+      exact hj_safe n (by omega) (by linear_combination h)
+    rw [c0_fiber_cycle_i_eq_neg_one _ _ hm hfib' hj']
+    simp only [Prod.mk.injEq]; exact ⟨trivial, by push_cast; ring, by push_cast; ring⟩
+
+-- Iterated: Case A, m = 5, 2 cycles from (2, 2, 2), fiber = 6 = 1
+example : (cycleStep .c0)^[2 * 5] ((2 : ZMod 5), (2 : ZMod 5), (2 : ZMod 5)) =
+    ((2 : ZMod 5), 2 + (2 : ZMod 5) * ((4 : ℕ) : ZMod 5), (2 : ZMod 5) + (2 : ZMod 5)) := by
+  refine c0_iter_generic (m := 5) _ _ _ (by omega) (by decide)
+    (by decide) (by decide) 2 (by omega) ?_
+  intro t ht
+  have : t = 0 ∨ t = 1 := by omega
+  rcases this with rfl | rfl <;> decide
+
+-- Iterated: Case B, m = 5, 2 cycles from (0, 2, 4), fiber = 6 = 1
+example : (cycleStep .c0)^[2 * 5] ((0 : ZMod 5), (2 : ZMod 5), (4 : ZMod 5)) =
+    ((0 : ZMod 5), 2 + (2 : ZMod 5) * ((3 : ℕ) : ZMod 5), (4 : ZMod 5) + 2 * (2 : ZMod 5)) := by
+  refine c0_iter_i_eq_zero (m := 5) _ _ (by omega) (by decide)
+    2 (by omega) ?_
+  intro t ht
+  have : t = 0 ∨ t = 1 := by omega
+  rcases this with rfl | rfl <;> decide
+
+-- Iterated: Case C, m = 5, 2 cycles from (-1, 0, 2), fiber = 1
+example : (cycleStep .c0)^[2 * 5] ((-1 : ZMod 5), (0 : ZMod 5), (2 : ZMod 5)) =
+    ((-1 : ZMod 5), 0 + (2 : ZMod 5), (2 : ZMod 5) + (2 : ZMod 5) * ((4 : ℕ) : ZMod 5)) := by
+  refine c0_iter_i_eq_neg_one (m := 5) _ _ (by omega) (by decide)
+    2 (by omega) ?_
+  intro t ht
+  have : t = 0 ∨ t = 1 := by omega
+  rcases this with rfl | rfl <;> decide
+
 -- Fiber cycle: Case A, m = 5, point (2, 1, 3) on fiber 1
 example : (cycleStep .c0)^[5] ((2 : ZMod 5), (1 : ZMod 5), (3 : ZMod 5)) =
     ((2 : ZMod 5), 1 + ((4 : ℕ) : ZMod 5), (3 : ZMod 5) + 1) :=
