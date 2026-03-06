@@ -201,6 +201,13 @@ example : (cycleStep .c0)^[3 ^ 3] (cycle0Entry (0 : ZMod 3)) = cycle0Entry 0 :=
 
 /-! ## No early return: orbit doesn't hit entry points within a block -/
 
+omit [NeZero m] in
+/-- A natural number t' with t' < m-1 is nonzero as an element of ZMod m after adding 1. -/
+theorem zmod_succ_ne_zero (t' : ℕ) (ht' : t' < m - 1) :
+    (t' : ZMod m) + 1 ≠ 0 := by
+  rw [show (t' : ZMod m) + 1 = ((1 + t' : ℕ) : ZMod m) from by push_cast; ring]
+  exact natCast_ne_zero (by omega)
+
 /-- Within a block (steps 1 through m²-1 from an entry point), the orbit never
     lands on any entry point. -/
 theorem c0_not_entry_within_block (hm : 2 < m) (hm_odd : Odd m)
@@ -239,9 +246,7 @@ theorem c0_not_entry_within_block (hm : 2 < m) (hm_odd : Odd m)
       intro h
       have h1 : (-2 : ZMod m) * ((t' : ZMod m) + 1) = 0 := by linear_combination h
       have h2 : (t' : ZMod m) + 1 = 0 := (neg_two_isUnit hm_odd).mul_right_eq_zero.mp h1
-      rw [show (t' : ZMod m) + 1 = ((t' + 1 : ℕ) : ZMod m) from by push_cast; ring] at h2
-      exact absurd (Nat.le_of_dvd (by omega) ((ZMod.natCast_eq_zero_iff _ m).mp h2))
-        (by omega)
+      exact absurd h2 (zmod_succ_ne_zero t' (by omega))
   · by_cases hi1 : i = -1
     · subst hi1
       rw [c0_iter_i_eq_neg_one (-1) (2 - -1) hm (by simp [fiber]; ring) t ht2
@@ -252,10 +257,8 @@ theorem c0_not_entry_within_block (hm : 2 < m) (hm_odd : Odd m)
         exact absurd (Nat.le_of_dvd (by omega)
           ((ZMod.natCast_eq_zero_iff t m).mp ht_zero)) (by omega)
       · intro h
-        have h1 : (t' : ZMod m) + 1 = 0 := by linear_combination h
-        rw [show (t' : ZMod m) + 1 = ((t' + 1 : ℕ) : ZMod m) from by push_cast; ring] at h1
-        exact absurd (Nat.le_of_dvd (by omega)
-          ((ZMod.natCast_eq_zero_iff _ m).mp h1)) (by omega)
+        exact absurd (by linear_combination h : (t' : ZMod m) + 1 = 0)
+          (zmod_succ_ne_zero t' (by omega))
     · rw [c0_iter_generic i (-1) (2 - i) hm (by simp [fiber]; ring) hi0 hi1 t ht2
           (fun t' ht' => ?_)] at heq
       · simp only [Prod.mk.injEq] at heq
@@ -267,10 +270,8 @@ theorem c0_not_entry_within_block (hm : 2 < m) (hm_odd : Odd m)
           ((ZMod.natCast_eq_zero_iff t m).mp ht_zero)) (by omega)
       · rw [natCast_m_sub_one (by omega)]
         intro h
-        have h1 : (t' : ZMod m) + 1 = 0 := by linear_combination -h
-        rw [show (t' : ZMod m) + 1 = ((t' + 1 : ℕ) : ZMod m) from by push_cast; ring] at h1
-        exact absurd (Nat.le_of_dvd (by omega)
-          ((ZMod.natCast_eq_zero_iff _ m).mp h1)) (by omega)
+        exact absurd (by linear_combination -h : (t' : ZMod m) + 1 = 0)
+          (zmod_succ_ne_zero t' (by omega))
 
 -- No early return tests: m = 3
 example : (cycleStep .c0)^[1] (cycle0Entry (0 : ZMod 3)) ≠ cycle0Entry 0 :=
