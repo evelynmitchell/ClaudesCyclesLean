@@ -6,6 +6,8 @@ Step-level lemmas for cycle 0's direction table.
 Each lemma characterizes `cycleStep .c0` for one row of Knuth's table.
 -/
 import ClaudesCycles.DirectionMap
+import Mathlib.Tactic.Ring
+import Mathlib.Tactic.Push
 
 namespace ClaudesCycles
 
@@ -106,6 +108,54 @@ theorem natCast_ne_neg_one {n : ℕ} (hm : 2 ≤ m) (hn : n < m - 2) :
   rw [hv, hv2] at this
   omega
 
+/-! ## Intermediate run lemmas for cycle 0
+
+Starting at fiber 1, consecutive steps through intermediate fibers
+(1 through m−2) just bump one coordinate repeatedly.
+-/
+
+private lemma fiber_add_j (i j k n : ZMod m) : fiber (i, j + n, k) = fiber (i, j, k) + n := by
+  simp [fiber]; ring
+
+private lemma fiber_add_k (i j k n : ZMod m) : fiber (i, j, k + n) = fiber (i, j, k) + n := by
+  simp [fiber]; ring
+
+/-- i ≠ -1: each intermediate step bumps j. -/
+theorem c0_intermediate_run_bump_j (i j k : ZMod m) (hm : 2 < m)
+    (hfib : fiber (i, j, k) = 1) (hi : i ≠ -1) (n : ℕ) (hn : n ≤ m - 2) :
+    (cycleStep .c0)^[n] (i, j, k) = (i, j + (n : ZMod m), k) := by
+  induction n with
+  | zero => simp
+  | succ n ih =>
+    have hn' : n ≤ m - 2 := by omega
+    rw [Function.iterate_succ_apply', ih hn']
+    have hfib_n : fiber (i, j + (n : ZMod m), k) = ((1 + n : ℕ) : ZMod m) := by
+      rw [fiber_add_j, hfib]; push_cast; ring
+    have h0 : fiber (i, j + (n : ZMod m), k) ≠ 0 := by
+      rw [hfib_n]; exact natCast_ne_zero (by omega)
+    have h1 : fiber (i, j + (n : ZMod m), k) ≠ -1 := by
+      rw [hfib_n]; exact natCast_ne_neg_one (by omega) (by omega)
+    rw [c0_step_mid_ine _ _ _ h0 h1 hi]
+    push_cast; ring_nf
+
+/-- i = -1: each intermediate step bumps k. -/
+theorem c0_intermediate_run_bump_k (j k : ZMod m) (hm : 2 < m)
+    (hfib : fiber ((-1 : ZMod m), j, k) = 1) (n : ℕ) (hn : n ≤ m - 2) :
+    (cycleStep .c0)^[n] ((-1 : ZMod m), j, k) = (-1, j, k + (n : ZMod m)) := by
+  induction n with
+  | zero => simp
+  | succ n ih =>
+    have hn' : n ≤ m - 2 := by omega
+    rw [Function.iterate_succ_apply', ih hn']
+    have hfib_n : fiber ((-1 : ZMod m), j, k + (n : ZMod m)) = ((1 + n : ℕ) : ZMod m) := by
+      rw [fiber_add_k, hfib]; push_cast; ring
+    have h0 : fiber ((-1 : ZMod m), j, k + (n : ZMod m)) ≠ 0 := by
+      rw [hfib_n]; exact natCast_ne_zero (by omega)
+    have h1 : fiber ((-1 : ZMod m), j, k + (n : ZMod m)) ≠ -1 := by
+      rw [hfib_n]; exact natCast_ne_neg_one (by omega) (by omega)
+    rw [c0_step_mid_ieq _ _ h0 h1]
+    push_cast; ring_nf
+
 /-! ## Tests -/
 
 example : ((4 : ℕ) : ZMod 5) = -1 := natCast_m_sub_one (m := 5) (by omega)
@@ -113,5 +163,15 @@ example : ((3 : ℕ) : ZMod 5) = -2 := natCast_m_sub_two (m := 5) (by omega)
 example : (1 : ZMod 5) ≠ -1 := @one_ne_neg_one 5 ⟨by omega⟩
 example : ((1 + 0 : ℕ) : ZMod 5) ≠ 0 := natCast_ne_zero (m := 5) (by omega)
 example : ((1 + 1 : ℕ) : ZMod 5) ≠ -1 := natCast_ne_neg_one (m := 5) (by omega) (by omega)
+
+example : (cycleStep .c0)^[3] ((0 : ZMod 5), -1, (2 : ZMod 5)) =
+    ((0 : ZMod 5), -1 + (3 : ZMod 5), (2 : ZMod 5)) :=
+  c0_intermediate_run_bump_j (m := 5) _ _ _
+    (by omega) (by simp [fiber]; ring) (by decide) 3 (by omega)
+
+example : (cycleStep .c0)^[3] ((-1 : ZMod 5), (0 : ZMod 5), (2 : ZMod 5)) =
+    ((-1 : ZMod 5), (0 : ZMod 5), 2 + (3 : ZMod 5)) :=
+  c0_intermediate_run_bump_k (m := 5) _ _
+    (by omega) (by simp [fiber]; ring) 3 (by omega)
 
 end ClaudesCycles
