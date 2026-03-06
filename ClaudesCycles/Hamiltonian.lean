@@ -175,6 +175,30 @@ example : (cycleStep .c0)^[3 ^ 2] (cycle0Entry (1 : ZMod 3)) = cycle0Entry (1 + 
 example : (cycleStep .c0)^[3 ^ 2] (cycle0Entry (2 : ZMod 3)) = cycle0Entry (2 + 1) :=
   cycle0_block_transition (by omega) ⟨1, by omega⟩ 2
 
+/-! ## Entry point periodicity for cycle 0 -/
+
+/-- After n block transitions, the entry point shifts by n. -/
+theorem cycle0_entry_shift (hm : 2 < m) (hm_odd : Odd m) (i : ZMod m) (n : ℕ) :
+    (cycleStep .c0)^[n * m ^ 2] (cycle0Entry i) = cycle0Entry (i + (n : ZMod m)) := by
+  induction n with
+  | zero => simp
+  | succ n ih =>
+    rw [show (n + 1) * m ^ 2 = m ^ 2 + n * m ^ 2 from by ring]
+    rw [Function.iterate_add_apply]
+    rw [ih, cycle0_block_transition hm hm_odd]
+    congr 1; push_cast; ring
+
+/-- Cycle 0 returns every entry point to itself after m³ steps. -/
+theorem cycle0_period_entry (hm : 2 < m) (hm_odd : Odd m) (i : ZMod m) :
+    (cycleStep .c0)^[m ^ 3] (cycle0Entry i) = cycle0Entry i := by
+  rw [show m ^ 3 = m * m ^ 2 from by ring]
+  rw [cycle0_entry_shift hm hm_odd i m]
+  simp
+
+-- Entry point periodicity test: m = 3
+example : (cycleStep .c0)^[3 ^ 3] (cycle0Entry (0 : ZMod 3)) = cycle0Entry 0 :=
+  cycle0_period_entry (by omega) ⟨1, by omega⟩ 0
+
 /-! ## Main Hamiltonian theorem for cycle 0 -/
 
 /-- Cycle 0 returns to start after m³ steps. -/
