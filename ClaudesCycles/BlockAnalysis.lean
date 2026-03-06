@@ -267,6 +267,10 @@ example : (cycleStep .c0)^[3] ((-1 : ZMod 5), (0 : ZMod 5), (2 : ZMod 5)) =
 After n complete fiber cycles (n·m steps), j and k follow arithmetic
 progressions.  The `hj_safe` hypothesis ensures no i-bump occurs at
 fiber 0 during any of the n cycles.
+
+Note: the `hn : n ≤ m - 1` bound is not used in these proofs directly,
+but is included so that downstream consumers (block transition, #8) can
+discharge `hj_safe` via `hn` without needing to re-state the bound.
 -/
 
 /-- Case A iterated: generic i. Each cycle shifts j by (m-1) and k by 1. -/
