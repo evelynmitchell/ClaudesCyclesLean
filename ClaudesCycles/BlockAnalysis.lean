@@ -396,4 +396,77 @@ example : (cycleStep .c0)^[3] ((1 : ZMod 3), (1 : ZMod 3), (2 : ZMod 3)) =
   c0_fiber_cycle_generic (m := 3) _ _ _ (by omega) (by decide)
     (by decide) (by decide) (by decide)
 
+/-! ## Bumping fiber cycle lemmas for cycle 0
+
+Starting at fiber 1, after m steps where j lands on -1 at fiber 0,
+the i-coordinate bumps.  These handle the boundary case excluded by
+the non-bumping `c0_fiber_cycle_*` lemmas above.
+-/
+
+/-- Case A bump: generic i (i ≠ 0, i ≠ -1), j + (m-1) = -1 → i bumps. -/
+theorem c0_fiber_cycle_generic_bump (i j k : ZMod m) (hm : 2 < m)
+    (hfib : fiber (i, j, k) = 1) (hi0 : i ≠ 0) (hi1 : i ≠ -1)
+    (hj_bump : j + ((m - 1 : ℕ) : ZMod m) = -1) :
+    (cycleStep .c0)^[m] (i, j, k) = (i + 1, -1, k) := by
+  have hm_split : (cycleStep .c0)^[m] (i, j, k) =
+      (cycleStep .c0)^[1] ((cycleStep .c0)^[1]
+        ((cycleStep .c0)^[m - 2] (i, j, k))) := by
+    rw [← Function.iterate_add_apply, ← Function.iterate_add_apply]; congr 1; omega
+  rw [hm_split, c0_intermediate_run_bump_j i j k hm hfib hi1 (m - 2) (le_refl _)]
+  -- Phase 2: fiber = -1, i ≠ 0 → bump j
+  have hfib_n1 : fiber (i, j + ((m - 2 : ℕ) : ZMod m), k) = -1 := by
+    rw [fiber_add_j, hfib, natCast_m_sub_two (by omega)]; ring
+  rw [Function.iterate_one, c0_step_fn1_ine _ _ _ hfib_n1 hi0]
+  -- Phase 3: fiber = 0, j + (m-2) + 1 = j + (m-1) = -1 → bump i
+  have hfib_0 : fiber (i, j + ((m - 2 : ℕ) : ZMod m) + 1, k) = 0 := by
+    rw [fiber_add_j, fiber_add_j, hfib, natCast_m_sub_two (by omega)]; ring
+  have hj' : j + ((m - 2 : ℕ) : ZMod m) + 1 = -1 := by
+    rw [natCast_m_sub_two (by omega)]
+    rw [show j + (-2 : ZMod m) + 1 = j + ((m - 1 : ℕ) : ZMod m) from by
+      rw [natCast_m_sub_one (by omega)]; ring]
+    exact hj_bump
+  rw [c0_step_f0_jn1 _ _ _ hfib_0 hj', hj']
+
+/-- Case B bump: i = 0, j + (m-2) = -1 → i bumps. -/
+theorem c0_fiber_cycle_i_eq_zero_bump (j k : ZMod m) (hm : 2 < m)
+    (hfib : fiber ((0 : ZMod m), j, k) = 1)
+    (hj_bump : j + ((m - 2 : ℕ) : ZMod m) = -1) :
+    (cycleStep .c0)^[m] ((0 : ZMod m), j, k) = (1, -1, k + 1) := by
+  have hi1 : (0 : ZMod m) ≠ -1 := Ne.symm (neg_one_ne_zero_of_one_lt (by omega))
+  have hm_split : (cycleStep .c0)^[m] ((0 : ZMod m), j, k) =
+      (cycleStep .c0)^[1] ((cycleStep .c0)^[1]
+        ((cycleStep .c0)^[m - 2] ((0 : ZMod m), j, k))) := by
+    rw [← Function.iterate_add_apply, ← Function.iterate_add_apply]; congr 1; omega
+  rw [hm_split, c0_intermediate_run_bump_j _ j k hm hfib hi1 (m - 2) (le_refl _)]
+  -- Phase 2: fiber = -1, i = 0 → bump k (not j)
+  have hfib_n1 : fiber ((0 : ZMod m), j + ((m - 2 : ℕ) : ZMod m), k) = -1 := by
+    rw [fiber_add_j, hfib, natCast_m_sub_two (by omega)]; ring
+  rw [Function.iterate_one, c0_step_fn1_ieq _ _ hfib_n1]
+  -- Phase 3: fiber = 0, j + (m-2) = -1 → bump i
+  have hfib_0 : fiber ((0 : ZMod m), j + ((m - 2 : ℕ) : ZMod m), k + 1) = 0 := by
+    rw [fiber_add_k, fiber_add_j, hfib, natCast_m_sub_two (by omega)]; ring
+  rw [c0_step_f0_jn1 _ _ _ hfib_0 hj_bump, hj_bump]
+  simp only [Prod.mk.injEq, and_true]; ring
+
+/-- Case C bump: i = -1, j + 1 = -1 → i bumps. -/
+theorem c0_fiber_cycle_i_eq_neg_one_bump (j k : ZMod m) (hm : 2 < m)
+    (hfib : fiber ((-1 : ZMod m), j, k) = 1)
+    (hj_bump : j + 1 = -1) :
+    (cycleStep .c0)^[m] ((-1 : ZMod m), j, k) = (0, -1, k + ((m - 2 : ℕ) : ZMod m)) := by
+  have hi0 : (-1 : ZMod m) ≠ 0 := neg_one_ne_zero_of_one_lt (by omega)
+  have hm_split : (cycleStep .c0)^[m] ((-1 : ZMod m), j, k) =
+      (cycleStep .c0)^[1] ((cycleStep .c0)^[1]
+        ((cycleStep .c0)^[m - 2] ((-1 : ZMod m), j, k))) := by
+    rw [← Function.iterate_add_apply, ← Function.iterate_add_apply]; congr 1; omega
+  rw [hm_split, c0_intermediate_run_bump_k j k hm hfib (m - 2) (le_refl _)]
+  -- Phase 2: fiber = -1, i = -1 ≠ 0 → bump j
+  have hfib_n1 : fiber ((-1 : ZMod m), j, k + ((m - 2 : ℕ) : ZMod m)) = -1 := by
+    rw [fiber_add_k, hfib, natCast_m_sub_two (by omega)]; ring
+  rw [Function.iterate_one, c0_step_fn1_ine _ _ _ hfib_n1 hi0]
+  -- Phase 3: fiber = 0, j + 1 = -1 → bump i
+  have hfib_0 : fiber ((-1 : ZMod m), j + 1, k + ((m - 2 : ℕ) : ZMod m)) = 0 := by
+    rw [fiber_add_j, fiber_add_k, hfib, natCast_m_sub_two (by omega)]; ring
+  rw [c0_step_f0_jn1 _ _ _ hfib_0 hj_bump, hj_bump]
+  simp only [Prod.mk.injEq, and_true]; ring
+
 end ClaudesCycles
