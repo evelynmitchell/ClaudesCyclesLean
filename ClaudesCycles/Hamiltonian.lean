@@ -8,9 +8,11 @@ Main result: for odd m ≥ 3, each of the three cycles visits all m³ vertices.
 import ClaudesCycles.DirectionMap
 import ClaudesCycles.Permutation
 import ClaudesCycles.BlockAnalysis
+import ClaudesCycles.Verify
 import Mathlib.Data.ZMod.Basic
 import Mathlib.GroupTheory.Perm.Cycle.Basic
 import Mathlib.Data.Fintype.Basic
+import Mathlib.Data.Fintype.Card
 
 namespace ClaudesCycles
 
@@ -280,17 +282,175 @@ example : (cycleStep .c0)^[1] (cycle0Entry (0 : ZMod 3)) ≠ cycle0Entry 0 :=
 example : (cycleStep .c0)^[4] (cycle0Entry (1 : ZMod 3)) ≠ cycle0Entry 2 :=
   c0_not_entry_within_block (by omega) ⟨1, by omega⟩ 1 2 4 (by omega) (by omega)
 
+/-! ## Orbit covers all vertices for cycle 0 -/
+
+omit [NeZero m] in
+/-- Different block indices give different entry points. -/
+theorem cycle0Entry_injective : Function.Injective (cycle0Entry : ZMod m → V m) := by
+  intro i j h
+  simp only [cycle0Entry, Prod.mk.injEq] at h
+  exact h.1
+
+/-- No early return: f^[k](eᵢ) ≠ eᵢ for 0 < k < m³. -/
+theorem c0_no_return_to_entry (hm : 2 < m) (hm_odd : Odd m) (i : ZMod m)
+    (k : ℕ) (hk : 0 < k) (hk' : k < m ^ 3) :
+    (cycleStep .c0)^[k] (cycle0Entry i) ≠ cycle0Entry i := by
+  have hm2_pos : 0 < m ^ 2 := pow_pos (by omega : 0 < m) 2
+  have hr : k % m ^ 2 < m ^ 2 := Nat.mod_lt k hm2_pos
+  have hq : k / m ^ 2 < m := by
+    rw [Nat.div_lt_iff_lt_mul hm2_pos]
+    calc k < m ^ 3 := hk'
+      _ = m * m ^ 2 := by ring
+  have hk_rw : k = k % m ^ 2 + k / m ^ 2 * m ^ 2 := by
+    have h := Nat.div_add_mod k (m ^ 2); rw [Nat.mul_comm] at h; omega
+  rw [hk_rw, Function.iterate_add_apply, cycle0_entry_shift hm hm_odd i (k / m ^ 2)]
+  by_cases hr0 : k % m ^ 2 = 0
+  · -- r = 0: f^[k](eᵢ) = e_{i+q}, need i+q ≠ i
+    simp only [hr0, Function.iterate_zero, id]
+    intro h
+    have hiq : i + (↑(k / m ^ 2) : ZMod m) = i := cycle0Entry_injective h
+    have hq_zero : (↑(k / m ^ 2) : ZMod m) = 0 := add_left_cancel (by rwa [add_zero])
+    rw [ZMod.natCast_eq_zero_iff] at hq_zero
+    have hq_pos : 0 < k / m ^ 2 :=
+      Nat.div_pos (Nat.le_of_dvd hk (Nat.dvd_of_mod_eq_zero hr0)) hm2_pos
+    exact absurd (Nat.le_of_dvd (by omega) hq_zero) (by omega)
+  · -- r > 0: within-block, can't hit any entry point
+    exact c0_not_entry_within_block hm hm_odd (i + ↑(k / m ^ 2)) i
+      (k % m ^ 2) (Nat.pos_of_ne_zero hr0) hr
+
+/-- The orbit map k ↦ f^[k](eᵢ) is injective on [0, m³). -/
+theorem c0_orbit_injOn (hm : 2 < m) (hm_odd : Odd m) (i : ZMod m) :
+    Set.InjOn (fun k => (cycleStep .c0)^[k] (cycle0Entry i))
+      ↑(Finset.range (m ^ 3)) := by
+  intro a ha b hb hab
+  simp only [Finset.coe_range, Set.mem_Iio] at ha hb
+  simp only at hab
+  -- hab : (cycleStep .c0)^[a] (cycle0Entry i) = (cycleStep .c0)^[b] (cycle0Entry i)
+  by_contra h_ne
+  -- WLOG a < b
+  have h : a < b ∨ b < a := by omega
+  rcases h with h | h
+  · -- From f^[a](e) = f^[b](e) and f^[m³](e) = e, derive f^[m³-b+a](e) = e
+    have key : (cycleStep .c0)^[m ^ 3 - b + a] (cycle0Entry i) = cycle0Entry i := by
+      have h1 : (cycleStep .c0)^[m ^ 3 - b + a] (cycle0Entry i)
+          = (cycleStep .c0)^[m ^ 3 - b] ((cycleStep .c0)^[a] (cycle0Entry i)) :=
+        Function.iterate_add_apply ..
+      have h2 : (cycleStep .c0)^[m ^ 3 - b] ((cycleStep .c0)^[b] (cycle0Entry i))
+          = cycle0Entry i := by
+        rw [← Function.iterate_add_apply,
+            show (m ^ 3 - b) + b = m ^ 3 from by omega]
+        exact cycle0_period_entry hm hm_odd i
+      rw [h1, hab, h2]
+    exact c0_no_return_to_entry hm hm_odd i (m ^ 3 - b + a) (by omega) (by omega) key
+  · -- Symmetric case: b < a
+    have key : (cycleStep .c0)^[m ^ 3 - a + b] (cycle0Entry i) = cycle0Entry i := by
+      have h1 : (cycleStep .c0)^[m ^ 3 - a + b] (cycle0Entry i)
+          = (cycleStep .c0)^[m ^ 3 - a] ((cycleStep .c0)^[b] (cycle0Entry i)) :=
+        Function.iterate_add_apply ..
+      have h2 : (cycleStep .c0)^[m ^ 3 - a] ((cycleStep .c0)^[a] (cycle0Entry i))
+          = cycle0Entry i := by
+        rw [← Function.iterate_add_apply,
+            show (m ^ 3 - a) + a = m ^ 3 from by omega]
+        exact cycle0_period_entry hm hm_odd i
+      rw [h1, hab.symm, h2]
+    exact c0_no_return_to_entry hm hm_odd i (m ^ 3 - a + b) (by omega) (by omega) key
+
 /-! ## Main Hamiltonian theorem for cycle 0 -/
+
+/-- The orbit of entry point 0 covers all of V m. -/
+theorem c0_orbit_eq_univ (hm : 2 < m) (hm_odd : Odd m) :
+    Finset.image (fun k => (cycleStep .c0)^[k] (cycle0Entry (0 : ZMod m)))
+      (Finset.range (m ^ 3)) = Finset.univ := by
+  apply Finset.eq_univ_of_card
+  rw [Finset.card_image_of_injOn (c0_orbit_injOn hm hm_odd (0 : ZMod m)), Finset.card_range,
+      card_V (m := m)]
+
+/-- Every vertex is in the orbit of entry point 0. -/
+theorem c0_in_orbit (hm : 2 < m) (hm_odd : Odd m) (v : V m) :
+    ∃ n, n < m ^ 3 ∧ (cycleStep .c0)^[n] (cycle0Entry (0 : ZMod m)) = v := by
+  have hv : v ∈ (Finset.univ : Finset (V m)) := Finset.mem_univ v
+  rw [← c0_orbit_eq_univ hm hm_odd, Finset.mem_image] at hv
+  obtain ⟨n, hn, rfl⟩ := hv
+  exact ⟨n, Finset.mem_range.mp hn, rfl⟩
 
 /-- Cycle 0 returns to start after m³ steps. -/
 theorem cycle0_period (hm : 2 < m) (hm_odd : Odd m) (v : V m) :
     (cycleStep .c0)^[m ^ 3] v = v := by
-  sorry
+  obtain ⟨n, _, hn_eq⟩ := c0_in_orbit hm hm_odd v
+  rw [← hn_eq, ← Function.iterate_add_apply,
+      show m ^ 3 + n = n + m ^ 3 from by omega,
+      Function.iterate_add_apply, cycle0_period_entry hm hm_odd (0 : ZMod m), hn_eq]
+
+/-- No vertex has a small period under cycle 0. -/
+theorem c0_no_small_period (hm : 2 < m) (hm_odd : Odd m) (v : V m)
+    (k : ℕ) (hk : 0 < k) (hk' : k < m ^ 3) :
+    (cycleStep .c0)^[k] v ≠ v := by
+  obtain ⟨n, hn_lt, hn_eq⟩ := c0_in_orbit hm hm_odd v
+  intro h_period
+  -- f^[k](f^[n](e₀)) = f^[n](e₀), so f^[k+n](e₀) = f^[n](e₀)
+  rw [← hn_eq, ← Function.iterate_add_apply] at h_period
+  by_cases hkn : k + n < m ^ 3
+  · -- k+n < m³: orbit injectivity gives k+n = n, so k = 0
+    have := c0_orbit_injOn hm hm_odd (0 : ZMod m)
+      (by simp only [Finset.coe_range, Set.mem_Iio]; omega)
+      (by simp only [Finset.coe_range, Set.mem_Iio]; exact hn_lt)
+      h_period
+    omega
+  · -- k+n ≥ m³: reduce by m³
+    push_neg at hkn
+    have hj_lt : k + n - m ^ 3 < m ^ 3 := by omega
+    have h_reduce : (cycleStep .c0)^[k + n] (cycle0Entry (0 : ZMod m))
+        = (cycleStep .c0)^[k + n - m ^ 3] (cycle0Entry (0 : ZMod m)) := by
+      conv_lhs =>
+        rw [show k + n = (k + n - m ^ 3) + m ^ 3 from by omega,
+            Function.iterate_add_apply]
+      rw [cycle0_period_entry hm hm_odd (0 : ZMod m)]
+    rw [h_reduce] at h_period
+    have := c0_orbit_injOn hm hm_odd (0 : ZMod m)
+      (by simp only [Finset.coe_range, Set.mem_Iio]; exact hj_lt)
+      (by simp only [Finset.coe_range, Set.mem_Iio]; exact hn_lt)
+      h_period
+    omega
 
 /-- The orbit of any vertex under cycle 0 has size m³ (i.e., cycle 0 is Hamiltonian). -/
 theorem cycle0_orbit_size (hm : 2 < m) (hm_odd : Odd m) (v : V m) :
-    Finset.card (Finset.image (fun k => (cycleStep .c0)^[k] v) (Finset.range (m ^ 3))) = m ^ 3 := by
-  sorry
+    (Finset.image (fun k => (cycleStep .c0)^[k] v) (Finset.range (m ^ 3))).card = m ^ 3 := by
+  rw [Finset.card_image_of_injOn, Finset.card_range]
+  intro a ha b hb hab
+  simp only [Finset.coe_range, Set.mem_Iio] at ha hb
+  simp only at hab
+  by_contra h_ne
+  rcases Nat.lt_or_gt_of_ne h_ne with h | h
+  · have key : (cycleStep .c0)^[m ^ 3 - b + a] v = v := by
+      calc (cycleStep .c0)^[m ^ 3 - b + a] v
+          = (cycleStep .c0)^[m ^ 3 - b] ((cycleStep .c0)^[a] v) :=
+            Function.iterate_add_apply ..
+        _ = (cycleStep .c0)^[m ^ 3 - b] ((cycleStep .c0)^[b] v) := by rw [hab]
+        _ = v := by
+            rw [← Function.iterate_add_apply,
+                show (m ^ 3 - b) + b = m ^ 3 from by omega]
+            exact cycle0_period hm hm_odd v
+    exact c0_no_small_period hm hm_odd v (m ^ 3 - b + a) (by omega) (by omega) key
+  · have key : (cycleStep .c0)^[m ^ 3 - a + b] v = v := by
+      calc (cycleStep .c0)^[m ^ 3 - a + b] v
+          = (cycleStep .c0)^[m ^ 3 - a] ((cycleStep .c0)^[b] v) :=
+            Function.iterate_add_apply ..
+        _ = (cycleStep .c0)^[m ^ 3 - a] ((cycleStep .c0)^[a] v) := by rw [hab.symm]
+        _ = v := by
+            rw [← Function.iterate_add_apply,
+                show (m ^ 3 - a) + a = m ^ 3 from by omega]
+            exact cycle0_period hm hm_odd v
+    exact c0_no_small_period hm hm_odd v (m ^ 3 - a + b) (by omega) (by omega) key
+
+-- cycle0_period test: m = 3
+example : (cycleStep .c0)^[3 ^ 3] ((0 : ZMod 3), (0 : ZMod 3), (0 : ZMod 3)) =
+    ((0 : ZMod 3), (0 : ZMod 3), (0 : ZMod 3)) :=
+  cycle0_period (by omega) ⟨1, by omega⟩ _
+
+-- cycle0_orbit_size test: m = 3
+example : (Finset.image (fun k => (cycleStep .c0)^[k] ((0 : ZMod 3), (0 : ZMod 3), (0 : ZMod 3)))
+    (Finset.range (3 ^ 3))).card = 3 ^ 3 :=
+  cycle0_orbit_size (by omega) ⟨1, by omega⟩ _
 
 /-! ## Cycles 1 and 2
 
