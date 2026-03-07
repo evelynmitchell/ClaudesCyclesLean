@@ -636,9 +636,249 @@ example : (Finset.image (fun k => (cycleStep .c1)^[k] ((0 : ZMod 3), (0 : ZMod 3
     (Finset.range (3 ^ 3))).card = 3 ^ 3 :=
   cycle1_orbit_size (by omega) ⟨1, by omega⟩ _
 
+/-! ## Cycle 2: no early return, orbit, and period
+
+Cycle 2 entry points are at fiber 0 (unlike cycles 0/1 at fiber 1).
+The not-entry-within-block proof needs a case split: non-multiples of m
+have wrong fiber, while multiples of m have i ≠ 0.
+-/
+
+/-- At step n·m within a block (0 < n < m), the i-coordinate is nonzero. -/
+theorem c2_entry_i_ne_zero_of_lap (hm : 2 < m) (hm_odd : Odd m)
+    (j : ZMod m) (n : ℕ) (hn : 0 < n) (hn' : n < m) :
+    ((cycleStep .c2)^[n * m] (cycle2Entry j)).1 ≠ 0 := by
+  have hi_safe_neg1 : ∀ t : ℕ, t < n → (0 : ZMod m) + (t : ZMod m) ≠ -1 := by
+    intro t ht; simp only [zero_add]; intro h
+    have h1 : (t : ZMod m) + 1 = 0 := by linear_combination h
+    rw [show (t : ZMod m) + 1 = ((t + 1 : ℕ) : ZMod m) from by push_cast; ring] at h1
+    rw [ZMod.natCast_eq_zero_iff] at h1
+    exact absurd (Nat.le_of_dvd (by omega) h1) (by omega)
+  have hi_safe_gen : ∀ t : ℕ, t < n →
+      (0 : ZMod m) + 2 * (t : ZMod m) + 1 ≠ -1 := by
+    intro t ht; simp only [zero_add]; intro h
+    have h1 : 2 * ((t : ZMod m) + 1) = 0 := by linear_combination h
+    have h2 : (-2 : ZMod m) * -((t : ZMod m) + 1) = 0 := by linear_combination h1
+    have h3 : -((t : ZMod m) + 1) = 0 :=
+      (neg_two_isUnit hm_odd).mul_right_eq_zero.mp h2
+    have h4 : (t : ZMod m) + 1 = 0 := by linear_combination -h3
+    rw [show (t : ZMod m) + 1 = ((t + 1 : ℕ) : ZMod m) from by push_cast; ring] at h4
+    rw [ZMod.natCast_eq_zero_iff] at h4
+    exact absurd (Nat.le_of_dvd (by omega) h4) (by omega)
+  by_cases hj : j = -1
+  · subst hj
+    simp only [cycle2Entry, neg_neg]
+    rw [c2_iter_j_neg1_laps _ 1 hm (by simp [fiber]) n (by omega) hi_safe_neg1]
+    simp only [zero_add]
+    intro h
+    rw [ZMod.natCast_eq_zero_iff] at h
+    exact absurd (Nat.le_of_dvd (by omega) h) (by omega)
+  · unfold cycle2Entry
+    rw [c2_iter_generic_laps _ j _ hm (by simp [fiber]) hj n (by omega) hi_safe_gen]
+    simp only [zero_add]
+    intro h
+    have : 2 * (n : ZMod m) = 0 := by linear_combination h
+    have : (-2 : ZMod m) * -(n : ZMod m) = 0 := by linear_combination this
+    have : -(n : ZMod m) = 0 := (neg_two_isUnit hm_odd).mul_right_eq_zero.mp this
+    have hn_zero : (n : ZMod m) = 0 := by linear_combination -this
+    rw [ZMod.natCast_eq_zero_iff] at hn_zero
+    exact absurd (Nat.le_of_dvd (by omega) hn_zero) (by omega)
+
+/-- Within a block (steps 1..m²-1 from a cycle 2 entry), the orbit never
+    lands on any entry point. -/
+theorem c2_not_entry_within_block (hm : 2 < m) (hm_odd : Odd m)
+    (j₀ j : ZMod m) (r : ℕ) (hr : 0 < r) (hr' : r < m ^ 2) :
+    (cycleStep .c2)^[r] (cycle2Entry j₀) ≠ cycle2Entry j := by
+  intro heq
+  have hfib := congr_arg fiber heq
+  rw [fiber_iterate, fiber_cycle2Entry, fiber_cycle2Entry] at hfib
+  have hr_zero : (r : ZMod m) = 0 := by linear_combination hfib
+  have hdvd : m ∣ r := by rwa [ZMod.natCast_eq_zero_iff] at hr_zero
+  obtain ⟨t, ht_eq⟩ := hdvd
+  have hrw : r = t * m := by rw [ht_eq, Nat.mul_comm]
+  have ht1 : 1 ≤ t := Nat.pos_of_mul_pos_left (ht_eq ▸ hr)
+  have ht2 : t < m := by
+    have : m * t < m * m := by
+      calc m * t = r := ht_eq.symm
+        _ < m ^ 2 := hr'
+        _ = m * m := Nat.pow_two m
+    exact Nat.lt_of_mul_lt_mul_left this
+  -- At step t*m, fiber = 0 but i ≠ 0
+  rw [hrw] at heq
+  have hi := c2_entry_i_ne_zero_of_lap hm hm_odd j₀ t ht1 ht2
+  have hi_eq : ((cycleStep .c2)^[t * m] (cycle2Entry j₀)).1 = 0 := by
+    rw [heq]; simp [cycle2Entry]
+  exact hi hi_eq
+
+/-- No early return: f^[k](e_j) ≠ e_j for 0 < k < m³. -/
+theorem c2_no_return_to_entry (hm : 2 < m) (hm_odd : Odd m) (j : ZMod m)
+    (k : ℕ) (hk : 0 < k) (hk' : k < m ^ 3) :
+    (cycleStep .c2)^[k] (cycle2Entry j) ≠ cycle2Entry j := by
+  have hm2_pos : 0 < m ^ 2 := pow_pos (by omega : 0 < m) 2
+  have hr : k % m ^ 2 < m ^ 2 := Nat.mod_lt k hm2_pos
+  have hq : k / m ^ 2 < m := by
+    rw [Nat.div_lt_iff_lt_mul hm2_pos]
+    calc k < m ^ 3 := hk'
+      _ = m * m ^ 2 := by ring
+  have hk_rw : k = k % m ^ 2 + k / m ^ 2 * m ^ 2 := by
+    have h := Nat.div_add_mod k (m ^ 2); rw [Nat.mul_comm] at h; omega
+  rw [hk_rw, Function.iterate_add_apply, cycle2_entry_shift hm hm_odd j (k / m ^ 2)]
+  by_cases hr0 : k % m ^ 2 = 0
+  · simp only [hr0, Function.iterate_zero, id]
+    intro h
+    have hjq := cycle2Entry_injective h
+    have hq_zero : (↑(k / m ^ 2) : ZMod m) * ((m - 2 : ℕ) : ZMod m) = 0 := by
+      linear_combination hjq
+    rw [natCast_m_sub_two (by omega)] at hq_zero
+    have : (-2 : ZMod m) * (↑(k / m ^ 2) : ZMod m) = 0 := by linear_combination hq_zero
+    have hq_z : (↑(k / m ^ 2) : ZMod m) = 0 :=
+      (neg_two_isUnit hm_odd).mul_right_eq_zero.mp this
+    rw [ZMod.natCast_eq_zero_iff] at hq_z
+    have hq_pos : 0 < k / m ^ 2 :=
+      Nat.div_pos (Nat.le_of_dvd hk (Nat.dvd_of_mod_eq_zero hr0)) hm2_pos
+    exact absurd (Nat.le_of_dvd (by omega) hq_z) (by omega)
+  · exact c2_not_entry_within_block hm hm_odd
+      (j + ↑(k / m ^ 2) * ((m - 2 : ℕ) : ZMod m)) j
+      (k % m ^ 2) (Nat.pos_of_ne_zero hr0) hr
+
+/-- The orbit map k ↦ f^[k](e_j) is injective on [0, m³). -/
+theorem c2_orbit_injOn (hm : 2 < m) (hm_odd : Odd m) (j : ZMod m) :
+    Set.InjOn (fun k => (cycleStep .c2)^[k] (cycle2Entry j))
+      ↑(Finset.range (m ^ 3)) := by
+  intro a ha b hb hab
+  simp only [Finset.coe_range, Set.mem_Iio] at ha hb
+  simp only at hab
+  by_contra h_ne
+  have h : a < b ∨ b < a := by omega
+  rcases h with h | h
+  · have key : (cycleStep .c2)^[m ^ 3 - b + a] (cycle2Entry j) =
+        cycle2Entry j := by
+      have h1 := Function.iterate_add_apply (cycleStep .c2) (m ^ 3 - b) a
+        (cycle2Entry j)
+      have h2 : (cycleStep .c2)^[m ^ 3 - b]
+          ((cycleStep .c2)^[b] (cycle2Entry j)) = cycle2Entry j := by
+        rw [← Function.iterate_add_apply,
+            show (m ^ 3 - b) + b = m ^ 3 from by omega]
+        exact cycle2_period_entry hm hm_odd j
+      rw [h1, hab, h2]
+    exact c2_no_return_to_entry hm hm_odd j
+      (m ^ 3 - b + a) (by omega) (by omega) key
+  · have key : (cycleStep .c2)^[m ^ 3 - a + b] (cycle2Entry j) =
+        cycle2Entry j := by
+      have h1 := Function.iterate_add_apply (cycleStep .c2) (m ^ 3 - a) b
+        (cycle2Entry j)
+      have h2 : (cycleStep .c2)^[m ^ 3 - a]
+          ((cycleStep .c2)^[a] (cycle2Entry j)) = cycle2Entry j := by
+        rw [← Function.iterate_add_apply,
+            show (m ^ 3 - a) + a = m ^ 3 from by omega]
+        exact cycle2_period_entry hm hm_odd j
+      rw [h1, hab.symm, h2]
+    exact c2_no_return_to_entry hm hm_odd j
+      (m ^ 3 - a + b) (by omega) (by omega) key
+
+/-- The orbit of cycle2Entry 0 covers all of V m. -/
+theorem c2_orbit_eq_univ (hm : 2 < m) (hm_odd : Odd m) :
+    Finset.image (fun k => (cycleStep .c2)^[k] (cycle2Entry (0 : ZMod m)))
+      (Finset.range (m ^ 3)) = Finset.univ := by
+  apply Finset.eq_univ_of_card
+  rw [Finset.card_image_of_injOn (c2_orbit_injOn hm hm_odd (0 : ZMod m)),
+      Finset.card_range, card_V (m := m)]
+
+/-- Every vertex is in the orbit of cycle2Entry 0. -/
+theorem c2_in_orbit (hm : 2 < m) (hm_odd : Odd m) (v : V m) :
+    ∃ n, n < m ^ 3 ∧
+      (cycleStep .c2)^[n] (cycle2Entry (0 : ZMod m)) = v := by
+  have hv : v ∈ (Finset.univ : Finset (V m)) := Finset.mem_univ v
+  rw [← c2_orbit_eq_univ hm hm_odd, Finset.mem_image] at hv
+  obtain ⟨n, hn, rfl⟩ := hv
+  exact ⟨n, Finset.mem_range.mp hn, rfl⟩
+
+/-- Cycle 2 returns to start after m³ steps. -/
 theorem cycle2_period (hm : 2 < m) (hm_odd : Odd m) (v : V m) :
     (cycleStep .c2)^[m ^ 3] v = v := by
-  sorry
+  obtain ⟨n, _, hn_eq⟩ := c2_in_orbit hm hm_odd v
+  rw [← hn_eq, ← Function.iterate_add_apply,
+      show m ^ 3 + n = n + m ^ 3 from by omega,
+      Function.iterate_add_apply,
+      cycle2_period_entry hm hm_odd (0 : ZMod m), hn_eq]
+
+/-- No vertex has a small period under cycle 2. -/
+theorem c2_no_small_period (hm : 2 < m) (hm_odd : Odd m) (v : V m)
+    (k : ℕ) (hk : 0 < k) (hk' : k < m ^ 3) :
+    (cycleStep .c2)^[k] v ≠ v := by
+  obtain ⟨n, hn_lt, hn_eq⟩ := c2_in_orbit hm hm_odd v
+  intro h_period
+  rw [← hn_eq, ← Function.iterate_add_apply] at h_period
+  by_cases hkn : k + n < m ^ 3
+  · have := c2_orbit_injOn hm hm_odd (0 : ZMod m)
+      (by simp only [Finset.coe_range, Set.mem_Iio]; omega)
+      (by simp only [Finset.coe_range, Set.mem_Iio]; exact hn_lt)
+      h_period
+    omega
+  · push_neg at hkn
+    have hj_lt : k + n - m ^ 3 < m ^ 3 := by omega
+    have h_reduce : (cycleStep .c2)^[k + n] (cycle2Entry (0 : ZMod m))
+        = (cycleStep .c2)^[k + n - m ^ 3]
+          (cycle2Entry (0 : ZMod m)) := by
+      conv_lhs =>
+        rw [show k + n = (k + n - m ^ 3) + m ^ 3 from by omega,
+            Function.iterate_add_apply]
+      rw [cycle2_period_entry hm hm_odd (0 : ZMod m)]
+    rw [h_reduce] at h_period
+    have := c2_orbit_injOn hm hm_odd (0 : ZMod m)
+      (by simp only [Finset.coe_range, Set.mem_Iio]; exact hj_lt)
+      (by simp only [Finset.coe_range, Set.mem_Iio]; exact hn_lt)
+      h_period
+    omega
+
+/-- The orbit of any vertex under cycle 2 has size m³. -/
+theorem cycle2_orbit_size (hm : 2 < m) (hm_odd : Odd m) (v : V m) :
+    (Finset.image (fun k => (cycleStep .c2)^[k] v)
+      (Finset.range (m ^ 3))).card = m ^ 3 := by
+  rw [Finset.card_image_of_injOn, Finset.card_range]
+  intro a ha b hb hab
+  simp only [Finset.coe_range, Set.mem_Iio] at ha hb
+  simp only at hab
+  by_contra h_ne
+  rcases Nat.lt_or_gt_of_ne h_ne with h | h
+  · have key : (cycleStep .c2)^[m ^ 3 - b + a] v = v := by
+      calc (cycleStep .c2)^[m ^ 3 - b + a] v
+          = (cycleStep .c2)^[m ^ 3 - b]
+            ((cycleStep .c2)^[a] v) :=
+              Function.iterate_add_apply ..
+        _ = (cycleStep .c2)^[m ^ 3 - b]
+            ((cycleStep .c2)^[b] v) := by rw [hab]
+        _ = v := by
+            rw [← Function.iterate_add_apply,
+                show (m ^ 3 - b) + b = m ^ 3 from by omega]
+            exact cycle2_period hm hm_odd v
+    exact c2_no_small_period hm hm_odd v
+      (m ^ 3 - b + a) (by omega) (by omega) key
+  · have key : (cycleStep .c2)^[m ^ 3 - a + b] v = v := by
+      calc (cycleStep .c2)^[m ^ 3 - a + b] v
+          = (cycleStep .c2)^[m ^ 3 - a]
+            ((cycleStep .c2)^[b] v) :=
+              Function.iterate_add_apply ..
+        _ = (cycleStep .c2)^[m ^ 3 - a]
+            ((cycleStep .c2)^[a] v) := by rw [hab.symm]
+        _ = v := by
+            rw [← Function.iterate_add_apply,
+                show (m ^ 3 - a) + a = m ^ 3 from by omega]
+            exact cycle2_period hm hm_odd v
+    exact c2_no_small_period hm hm_odd v
+      (m ^ 3 - a + b) (by omega) (by omega) key
+
+-- cycle2_period test: m = 3
+example : (cycleStep .c2)^[3 ^ 3]
+    ((0 : ZMod 3), (0 : ZMod 3), (0 : ZMod 3)) =
+    ((0 : ZMod 3), (0 : ZMod 3), (0 : ZMod 3)) :=
+  cycle2_period (by omega) ⟨1, by omega⟩ _
+
+-- cycle2_orbit_size test: m = 3
+example : (Finset.image
+    (fun k => (cycleStep .c2)^[k]
+      ((0 : ZMod 3), (0 : ZMod 3), (0 : ZMod 3)))
+    (Finset.range (3 ^ 3))).card = 3 ^ 3 :=
+  cycle2_orbit_size (by omega) ⟨1, by omega⟩ _
 
 /-! ## Main theorem: arc-disjoint Hamiltonian decomposition -/
 
