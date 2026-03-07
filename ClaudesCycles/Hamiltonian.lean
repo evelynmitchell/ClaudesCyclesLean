@@ -79,15 +79,6 @@ common difference -2 at fiber-0 positions. Since gcd(2, m) = 1 for odd m,
 this visits all m values of j.
 -/
 
-omit [NeZero m] in
-/-- The -2 shift is a unit in ZMod m when m is odd. -/
-theorem neg_two_isUnit (hm_odd : Odd m) :
-    IsUnit (-2 : ZMod m) := by
-  apply IsUnit.neg
-  rw [show (2 : ZMod m) = ((2 : ℕ) : ZMod m) from by push_cast; ring]
-  rw [ZMod.isUnit_iff_coprime]
-  exact hm_odd.coprime_two_left
-
 /-! ## Block transition: after m² steps, move to next block -/
 
 /-- After m² steps of cycle 0 from entry i, we reach entry (i+1). -/
