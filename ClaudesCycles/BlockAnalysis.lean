@@ -115,10 +115,10 @@ Starting at fiber 1, consecutive steps through intermediate fibers
 (1 through m−2) just bump one coordinate repeatedly.
 -/
 
-private lemma fiber_add_j (i j k n : ZMod m) : fiber (i, j + n, k) = fiber (i, j, k) + n := by
+lemma fiber_add_j (i j k n : ZMod m) : fiber (i, j + n, k) = fiber (i, j, k) + n := by
   simp [fiber]; ring
 
-private lemma fiber_add_k (i j k n : ZMod m) : fiber (i, j, k + n) = fiber (i, j, k) + n := by
+lemma fiber_add_k (i j k n : ZMod m) : fiber (i, j, k + n) = fiber (i, j, k) + n := by
   simp [fiber]; ring
 
 /-- i ≠ -1: each intermediate step bumps j. -/
@@ -523,7 +523,7 @@ Starting at fiber 1, consecutive steps through intermediate fibers
 just bump i (uniform — no case split on coordinates).
 -/
 
-private lemma fiber_add_i (i j k n : ZMod m) : fiber (i + n, j, k) = fiber (i, j, k) + n := by
+lemma fiber_add_i (i j k n : ZMod m) : fiber (i + n, j, k) = fiber (i, j, k) + n := by
   simp [fiber]; ring
 
 /-- Each intermediate step bumps i. -/
@@ -714,5 +714,333 @@ example : (cycleStep .c1)^[3 ^ 2] (cycle1Entry (1 : ZMod 3)) = cycle1Entry (1 + 
 -- Entry point periodicity test: m = 3
 example : (cycleStep .c1)^[3 ^ 3] (cycle1Entry (0 : ZMod 3)) = cycle1Entry 0 :=
   cycle1_period_entry (by omega) ⟨1, by omega⟩ 0
+
+/-! ## Step-level lemmas for cycle 2
+
+The direction table for cycle 2 has five rows, determined by the fiber
+value `s = i + j + k` and secondary coordinate conditions.
+
+**Naming convention:** `c2_step_<fiber>_<condition>`
+-/
+
+/-- Cycle 2, fiber = 0, j ≠ -1 → bump i. -/
+theorem c2_step_f0_jne (i j k : ZMod m)
+    (hs : fiber (i, j, k) = 0) (hj : j ≠ -1) :
+    cycleStep .c2 (i, j, k) = (i + 1, j, k) := by
+  simp only [cycleStep_def, dirMap_c2, dirCycle2, fiber] at *
+  split_ifs; simp_all [bump]
+
+/-- Cycle 2, fiber = 0, j = -1 → bump k. -/
+theorem c2_step_f0_jeq (i k : ZMod m)
+    (hs : fiber (i, (-1 : ZMod m), k) = 0) :
+    cycleStep .c2 (i, (-1 : ZMod m), k) = (i, -1, k + 1) := by
+  simp only [cycleStep_def, dirMap_c2, dirCycle2, fiber] at *
+  split_ifs <;> simp_all [bump]
+
+/-- Cycle 2, fiber = -1 → bump i. -/
+theorem c2_step_fn1 (i j k : ZMod m)
+    (hs : fiber (i, j, k) = -1) :
+    cycleStep .c2 (i, j, k) = (i + 1, j, k) := by
+  simp only [cycleStep_def, dirMap_c2, dirCycle2, fiber] at *
+  split_ifs <;> simp_all [bump]
+
+/-- Cycle 2, intermediate fiber, i ≠ -1 → bump k. -/
+theorem c2_step_mid_ine (i j k : ZMod m)
+    (hs0 : fiber (i, j, k) ≠ 0) (hs1 : fiber (i, j, k) ≠ -1) (hi : i ≠ -1) :
+    cycleStep .c2 (i, j, k) = (i, j, k + 1) := by
+  simp only [cycleStep_def, dirMap_c2, dirCycle2, fiber] at *
+  split_ifs <;> simp_all [bump]
+
+/-- Cycle 2, intermediate fiber, i = -1 → bump j. -/
+theorem c2_step_mid_ieq (j k : ZMod m)
+    (hs0 : fiber ((-1 : ZMod m), j, k) ≠ 0)
+    (hs1 : fiber ((-1 : ZMod m), j, k) ≠ -1) :
+    cycleStep .c2 ((-1 : ZMod m), j, k) = (-1, j + 1, k) := by
+  simp only [cycleStep_def, dirMap_c2, dirCycle2, fiber] at *
+  split_ifs <;> simp_all [bump]
+
+/-! ## Intermediate run lemmas for cycle 2
+
+Starting at fiber 1, consecutive steps through intermediate fibers
+bump either k (when i ≠ -1) or j (when i = -1).
+-/
+
+/-- i ≠ -1: each intermediate step bumps k. -/
+theorem c2_intermediate_run_bump_k (i j k : ZMod m) (hm : 2 < m)
+    (hfib : fiber (i, j, k) = 1) (hi : i ≠ -1) (n : ℕ) (hn : n ≤ m - 2) :
+    (cycleStep .c2)^[n] (i, j, k) = (i, j, k + (n : ZMod m)) := by
+  induction n with
+  | zero => simp
+  | succ n ih =>
+    have hn' : n ≤ m - 2 := by omega
+    rw [Function.iterate_succ_apply', ih hn']
+    have hfib_n : fiber (i, j, k + (n : ZMod m)) = ((1 + n : ℕ) : ZMod m) := by
+      rw [fiber_add_k, hfib]; push_cast; ring
+    rw [c2_step_mid_ine _ _ _ (by rw [hfib_n]; exact natCast_ne_zero (by omega))
+      (by rw [hfib_n]; exact natCast_ne_neg_one (by omega) (by omega)) hi]
+    push_cast; ring_nf
+
+/-- i = -1: each intermediate step bumps j. -/
+theorem c2_intermediate_run_bump_j (j k : ZMod m) (hm : 2 < m)
+    (hfib : fiber ((-1 : ZMod m), j, k) = 1) (n : ℕ) (hn : n ≤ m - 2) :
+    (cycleStep .c2)^[n] ((-1 : ZMod m), j, k) = (-1, j + (n : ZMod m), k) := by
+  induction n with
+  | zero => simp
+  | succ n ih =>
+    have hn' : n ≤ m - 2 := by omega
+    rw [Function.iterate_succ_apply', ih hn']
+    have hfib_n : fiber ((-1 : ZMod m), j + (n : ZMod m), k) = ((1 + n : ℕ) : ZMod m) := by
+      rw [fiber_add_j, hfib]; push_cast; ring
+    rw [c2_step_mid_ieq _ _ (by rw [hfib_n]; exact natCast_ne_zero (by omega))
+      (by rw [hfib_n]; exact natCast_ne_neg_one (by omega) (by omega))]
+    push_cast; ring_nf
+
+/-! ## Lap lemmas for cycle 2
+
+A "lap" is m steps starting from fiber 0, returning to fiber 0.
+Four cases depending on j and the i-value after the first step.
+-/
+
+/-- Lap Case 1: j ≠ -1, i+1 ≠ -1 (generic). Net: i → i+2, k → k+(m-2). -/
+theorem c2_lap_generic (i j k : ZMod m) (hm : 2 < m)
+    (hfib : fiber (i, j, k) = 0) (hj : j ≠ -1) (hi : i + 1 ≠ -1) :
+    (cycleStep .c2)^[m] (i, j, k) = (i + 2, j, k + ((m - 2 : ℕ) : ZMod m)) := by
+  have hm_split : (cycleStep .c2)^[m] (i, j, k) =
+      (cycleStep .c2)^[1] ((cycleStep .c2)^[m - 2]
+        ((cycleStep .c2)^[1] (i, j, k))) := by
+    rw [← Function.iterate_add_apply, ← Function.iterate_add_apply]; congr 1; omega
+  rw [hm_split, Function.iterate_one, c2_step_f0_jne i j k hfib hj]
+  have hfib1 : fiber (i + 1, j, k) = 1 := by rw [fiber_add_i, hfib]; ring
+  rw [c2_intermediate_run_bump_k _ j k hm hfib1 hi (m - 2) (le_refl _)]
+  have hfib_n1 : fiber (i + 1, j, k + ((m - 2 : ℕ) : ZMod m)) = -1 := by
+    rw [fiber_add_k, hfib1, natCast_m_sub_two (by omega)]; ring
+  rw [c2_step_fn1 _ _ _ hfib_n1]; ring_nf
+
+/-- Lap Case 2: j ≠ -1, i = -2 (j-shift). Net: i → 0, j → j+(m-2). -/
+theorem c2_lap_j_shift (j k : ZMod m) (hm : 2 < m)
+    (hfib : fiber ((-2 : ZMod m), j, k) = 0) (hj : j ≠ -1) :
+    (cycleStep .c2)^[m] ((-2 : ZMod m), j, k) =
+      (0, j + ((m - 2 : ℕ) : ZMod m), k) := by
+  have hm_split : (cycleStep .c2)^[m] ((-2 : ZMod m), j, k) =
+      (cycleStep .c2)^[1] ((cycleStep .c2)^[m - 2]
+        ((cycleStep .c2)^[1] ((-2 : ZMod m), j, k))) := by
+    rw [← Function.iterate_add_apply, ← Function.iterate_add_apply]; congr 1; omega
+  rw [hm_split, Function.iterate_one, c2_step_f0_jne _ j k hfib hj]
+  have h_eq : (-2 : ZMod m) + 1 = -1 := by ring
+  have hfib1 : fiber ((-1 : ZMod m), j, k) = 1 := by
+    have : fiber ((-2 : ZMod m) + 1, j, k) = 1 := by rw [fiber_add_i, hfib]; ring
+    rwa [h_eq] at this
+  conv_lhs =>
+    rw [show ((-2 : ZMod m) + 1, j, k) = ((-1 : ZMod m), j, k) from by ext <;> simp [h_eq]]
+  rw [c2_intermediate_run_bump_j j k hm hfib1 (m - 2) (le_refl _)]
+  have hfib_n1 : fiber ((-1 : ZMod m), j + ((m - 2 : ℕ) : ZMod m), k) = -1 := by
+    rw [fiber_add_j, hfib1, natCast_m_sub_two (by omega)]; ring
+  rw [c2_step_fn1 _ _ _ hfib_n1]; congr 1; ring
+
+/-- Lap Case 3: j = -1, i ≠ -1. Net: i → i+1, k → k+(m-1). -/
+theorem c2_lap_j_neg1 (i k : ZMod m) (hm : 2 < m)
+    (hfib : fiber (i, (-1 : ZMod m), k) = 0) (hi : i ≠ -1) :
+    (cycleStep .c2)^[m] (i, (-1 : ZMod m), k) =
+      (i + 1, -1, k + ((m - 1 : ℕ) : ZMod m)) := by
+  have hm_split : (cycleStep .c2)^[m] (i, (-1 : ZMod m), k) =
+      (cycleStep .c2)^[1] ((cycleStep .c2)^[m - 2]
+        ((cycleStep .c2)^[1] (i, (-1 : ZMod m), k))) := by
+    rw [← Function.iterate_add_apply, ← Function.iterate_add_apply]; congr 1; omega
+  rw [hm_split, Function.iterate_one, c2_step_f0_jeq i k hfib]
+  have hfib1 : fiber (i, (-1 : ZMod m), k + 1) = 1 := by
+    rw [fiber_add_k, hfib]; ring
+  rw [c2_intermediate_run_bump_k _ (-1) _ hm hfib1 hi (m - 2) (le_refl _)]
+  have hfib_n1 : fiber (i, (-1 : ZMod m), k + 1 + ((m - 2 : ℕ) : ZMod m)) = -1 := by
+    rw [fiber_add_k, hfib1, natCast_m_sub_two (by omega)]; ring
+  rw [c2_step_fn1 _ _ _ hfib_n1]
+  simp only [Prod.mk.injEq, true_and]
+  rw [natCast_m_sub_two (by omega), natCast_m_sub_one (by omega)]; ring
+
+/-- Lap Case 4: j = -1, i = -1 (exit). Net: i → 0, j → -3, k → k+1. -/
+theorem c2_lap_j_neg1_exit (k : ZMod m) (hm : 2 < m)
+    (hfib : fiber ((-1 : ZMod m), (-1 : ZMod m), k) = 0) :
+    (cycleStep .c2)^[m] ((-1 : ZMod m), (-1 : ZMod m), k) = (0, -3, k + 1) := by
+  have hm_split : (cycleStep .c2)^[m] ((-1 : ZMod m), (-1 : ZMod m), k) =
+      (cycleStep .c2)^[1] ((cycleStep .c2)^[m - 2]
+        ((cycleStep .c2)^[1] ((-1 : ZMod m), (-1 : ZMod m), k))) := by
+    rw [← Function.iterate_add_apply, ← Function.iterate_add_apply]; congr 1; omega
+  rw [hm_split, Function.iterate_one, c2_step_f0_jeq _ k hfib]
+  have hfib1 : fiber ((-1 : ZMod m), (-1 : ZMod m), k + 1) = 1 := by
+    rw [fiber_add_k, hfib]; ring
+  rw [c2_intermediate_run_bump_j (-1) (k + 1) hm hfib1 (m - 2) (le_refl _)]
+  have hfib_n1 : fiber ((-1 : ZMod m), -1 + ((m - 2 : ℕ) : ZMod m), k + 1) = -1 := by
+    rw [fiber_add_j, hfib1, natCast_m_sub_two (by omega)]; ring
+  rw [c2_step_fn1 _ _ _ hfib_n1]
+  congr 1
+  · ring
+  congr 1
+  · rw [natCast_m_sub_two (by omega)]; ring
+
+/-! ## Iterated lap lemmas for cycle 2
+
+After n laps (n·m steps), coordinates follow arithmetic progressions.
+-/
+
+/-- j ≠ -1 iterated: i shifts by 2n, k shifts by n·(m-2). -/
+theorem c2_iter_generic_laps (i j k : ZMod m) (hm : 2 < m)
+    (hfib : fiber (i, j, k) = 0) (hj : j ≠ -1) (n : ℕ) (hn : n ≤ m - 1)
+    (hi_safe : ∀ t : ℕ, t < n → i + 2 * (t : ZMod m) + 1 ≠ -1) :
+    (cycleStep .c2)^[n * m] (i, j, k) =
+      (i + 2 * (n : ZMod m), j, k + (n : ZMod m) * ((m - 2 : ℕ) : ZMod m)) := by
+  induction n with
+  | zero => simp
+  | succ n ih =>
+    have hn' : n ≤ m - 1 := by omega
+    have hsplit : (cycleStep .c2)^[(n + 1) * m] (i, j, k) =
+        (cycleStep .c2)^[m] ((cycleStep .c2)^[n * m] (i, j, k)) := by
+      rw [← Function.iterate_add_apply]; congr 1; ring
+    rw [hsplit, ih hn' (fun t ht => hi_safe t (by omega))]
+    have hfib' : fiber (i + 2 * (n : ZMod m), j,
+        k + (n : ZMod m) * ((m - 2 : ℕ) : ZMod m)) = 0 := by
+      rw [fiber_add_k, fiber_add_i, hfib, natCast_m_sub_two (by omega)]; ring
+    rw [c2_lap_generic _ _ _ hm hfib' hj (hi_safe n (by omega))]
+    simp only [Prod.mk.injEq]; exact ⟨by push_cast; ring, trivial, by push_cast; ring⟩
+
+/-- j = -1 iterated: i shifts by n, k shifts by n·(m-1). -/
+theorem c2_iter_j_neg1_laps (i k : ZMod m) (hm : 2 < m)
+    (hfib : fiber (i, (-1 : ZMod m), k) = 0) (n : ℕ) (hn : n ≤ m - 1)
+    (hi_safe : ∀ t : ℕ, t < n → i + (t : ZMod m) ≠ -1) :
+    (cycleStep .c2)^[n * m] (i, (-1 : ZMod m), k) =
+      (i + (n : ZMod m), -1, k + (n : ZMod m) * ((m - 1 : ℕ) : ZMod m)) := by
+  induction n with
+  | zero => simp
+  | succ n ih =>
+    have hn' : n ≤ m - 1 := by omega
+    have hsplit : (cycleStep .c2)^[(n + 1) * m] (i, (-1 : ZMod m), k) =
+        (cycleStep .c2)^[m] ((cycleStep .c2)^[n * m] (i, (-1 : ZMod m), k)) := by
+      rw [← Function.iterate_add_apply]; congr 1; ring
+    rw [hsplit, ih hn' (fun t ht => hi_safe t (by omega))]
+    have hfib' : fiber (i + (n : ZMod m), (-1 : ZMod m),
+        k + (n : ZMod m) * ((m - 1 : ℕ) : ZMod m)) = 0 := by
+      rw [fiber_add_k, fiber_add_i, hfib, natCast_m_sub_one (by omega)]; ring
+    rw [c2_lap_j_neg1 _ _ hm hfib' (hi_safe n (by omega))]
+    simp only [Prod.mk.injEq, true_and]
+    exact ⟨by push_cast; ring, by push_cast; ring⟩
+
+/-! ## Block transition for cycle 2
+
+After m² steps from entry point j, we reach entry point j+(m-2).
+The proof splits on j = -1 vs j ≠ -1.
+-/
+
+/-- Entry point for block j of cycle 2. -/
+def cycle2Entry (j : ZMod m) : V m := (0, j, -j)
+
+/-- The fiber of every cycle 2 entry point is 0. -/
+@[simp]
+theorem fiber_cycle2Entry (j : ZMod m) :
+    fiber (cycle2Entry j) = 0 := by
+  simp [cycle2Entry, fiber]
+
+omit [NeZero m] in
+/-- Different block indices give different cycle 2 entry points. -/
+theorem cycle2Entry_injective : Function.Injective (cycle2Entry : ZMod m → V m) := by
+  intro i j h
+  simp only [cycle2Entry, Prod.mk.injEq] at h
+  exact h.2.1
+
+/-- After m² steps of cycle 2 from entry j, we reach entry j+(m-2). -/
+theorem cycle2_block_transition (hm : 2 < m) (hm_odd : Odd m) (j : ZMod m) :
+    (cycleStep .c2)^[m ^ 2] (cycle2Entry j) = cycle2Entry (j + ((m - 2 : ℕ) : ZMod m)) := by
+  have hsplit : (cycleStep .c2)^[m ^ 2] (cycle2Entry j) =
+      (cycleStep .c2)^[m] ((cycleStep .c2)^[(m - 1) * m] (cycle2Entry j)) := by
+    rw [← Function.iterate_add_apply]; congr 1
+    have : m ^ 2 = (m - 1) * m + m := by
+      rw [Nat.sub_one_mul, Nat.sub_add_cancel (Nat.le_mul_of_pos_right m (by omega))]; ring
+    omega
+  rw [hsplit]
+  by_cases hj : j = -1
+  · -- Case j = -1: use iterated j=-1 laps + exit
+    subst hj
+    simp only [cycle2Entry, neg_neg]
+    rw [c2_iter_j_neg1_laps (0 : ZMod m) 1 hm (by simp [fiber]) (m - 1) le_rfl ?hi_safe]
+    · have h_i_eq : (0 : ZMod m) + ↑(m - 1) = -1 := by
+        rw [natCast_m_sub_one (by omega)]; ring
+      have hfib' : fiber ((-1 : ZMod m), (-1 : ZMod m),
+          1 + ↑(m - 1) * ((m - 1 : ℕ) : ZMod m)) = 0 := by
+        unfold fiber; rw [natCast_m_sub_one (by omega)]; ring
+      conv_lhs =>
+        rw [show ((0 : ZMod m) + ↑(m - 1), (-1 : ZMod m),
+            1 + ↑(m - 1) * ((m - 1 : ℕ) : ZMod m)) =
+          ((-1 : ZMod m), -1, 1 + ↑(m - 1) * ((m - 1 : ℕ) : ZMod m))
+          from by ext <;> simp [h_i_eq]]
+      rw [c2_lap_j_neg1_exit _ hm hfib']
+      simp only [Prod.mk.injEq]
+      refine ⟨trivial, ?_, ?_⟩
+      · rw [natCast_m_sub_two (by omega)]; ring
+      · rw [natCast_m_sub_one (by omega), natCast_m_sub_two (by omega)]; ring
+    case hi_safe =>
+      intro t ht
+      simp only [zero_add]
+      intro h
+      have h1 : (t : ZMod m) + 1 = 0 := by linear_combination h
+      rw [show (t : ZMod m) + 1 = ((t + 1 : ℕ) : ZMod m) from by push_cast; ring] at h1
+      rw [ZMod.natCast_eq_zero_iff] at h1
+      exact absurd (Nat.le_of_dvd (by omega) h1) (by omega)
+  · -- Case j ≠ -1: use iterated generic laps + j-shift
+    unfold cycle2Entry
+    rw [c2_iter_generic_laps _ j _ hm (by simp [fiber]) hj (m - 1) le_rfl ?hi_safe]
+    · have h_i_eq : (0 : ZMod m) + 2 * ↑(m - 1) = -2 := by
+        rw [natCast_m_sub_one (by omega)]; ring
+      have hfib' : fiber ((-2 : ZMod m), j,
+          -j + ↑(m - 1) * ((m - 2 : ℕ) : ZMod m)) = 0 := by
+        unfold fiber; rw [natCast_m_sub_one (by omega), natCast_m_sub_two (by omega)]; ring
+      conv_lhs =>
+        rw [show ((0 : ZMod m) + 2 * ↑(m - 1), j,
+            -j + ↑(m - 1) * ((m - 2 : ℕ) : ZMod m)) =
+          ((-2 : ZMod m), j, -j + ↑(m - 1) * ((m - 2 : ℕ) : ZMod m))
+          from by ext <;> simp [h_i_eq]]
+      rw [c2_lap_j_shift _ _ hm hfib' hj]
+      simp only [Prod.mk.injEq]
+      refine ⟨trivial, trivial, ?_⟩
+      rw [natCast_m_sub_one (by omega), natCast_m_sub_two (by omega)]; ring
+    case hi_safe =>
+      intro t ht
+      simp only [zero_add]
+      intro h
+      have h1 : 2 * ((t : ZMod m) + 1) = 0 := by linear_combination h
+      have h2 : (-2 : ZMod m) * -((t : ZMod m) + 1) = 0 := by linear_combination h1
+      have h3 : -((t : ZMod m) + 1) = 0 := (neg_two_isUnit hm_odd).mul_right_eq_zero.mp h2
+      have h4 : (t : ZMod m) + 1 = 0 := by linear_combination -h3
+      rw [show (t : ZMod m) + 1 = ((t + 1 : ℕ) : ZMod m) from by push_cast; ring] at h4
+      rw [ZMod.natCast_eq_zero_iff] at h4
+      exact absurd (Nat.le_of_dvd (by omega) h4) (by omega)
+
+/-! ## Entry point periodicity for cycle 2 -/
+
+/-- After n block transitions, the entry point shifts by n·(m-2). -/
+theorem cycle2_entry_shift (hm : 2 < m) (hm_odd : Odd m) (j : ZMod m) (n : ℕ) :
+    (cycleStep .c2)^[n * m ^ 2] (cycle2Entry j) =
+      cycle2Entry (j + (n : ZMod m) * ((m - 2 : ℕ) : ZMod m)) := by
+  induction n with
+  | zero => simp
+  | succ n ih =>
+    rw [show (n + 1) * m ^ 2 = m ^ 2 + n * m ^ 2 from by ring]
+    rw [Function.iterate_add_apply]
+    rw [ih, cycle2_block_transition hm hm_odd]
+    congr 1; push_cast; ring
+
+/-- Cycle 2 returns every entry point to itself after m³ steps. -/
+theorem cycle2_period_entry (hm : 2 < m) (hm_odd : Odd m) (j : ZMod m) :
+    (cycleStep .c2)^[m ^ 3] (cycle2Entry j) = cycle2Entry j := by
+  rw [show m ^ 3 = m * m ^ 2 from by ring]
+  rw [cycle2_entry_shift hm hm_odd j m]
+  simp [cycle2Entry, natCast_m_sub_two (show 2 ≤ m by omega)]
+
+/-! ## Tests -/
+
+-- Block transition test: m = 3
+example : (cycleStep .c2)^[3 ^ 2] (cycle2Entry (0 : ZMod 3)) =
+    cycle2Entry (0 + ((1 : ℕ) : ZMod 3)) :=
+  cycle2_block_transition (by omega) ⟨1, by omega⟩ 0
+
+-- Entry point periodicity test: m = 3
+example : (cycleStep .c2)^[3 ^ 3] (cycle2Entry (0 : ZMod 3)) = cycle2Entry 0 :=
+  cycle2_period_entry (by omega) ⟨1, by omega⟩ 0
 
 end ClaudesCycles
