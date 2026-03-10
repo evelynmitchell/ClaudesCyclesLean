@@ -130,6 +130,34 @@ structure. `neg_neg` is not definitionally equal. Import visibility
 but collectively they accounted for a significant fraction of debugging
 time.
 
+## Related Work
+
+[septract/claudes-cycles-lean](https://github.com/septract/claudes-cycles-lean)
+is an independent Lean 4 formalization of the same result by
+[Mike Dodds](https://github.com/septract) (Galois, Inc), a professional
+formal-verification researcher. Both projects are sorry-free and target
+Lean 4.28.0 with Mathlib.
+
+### Comparison
+
+| | This repo | septract/claudes-cycles-lean |
+|---|---|---|
+| **Author** | Human mathematician + Claude (AI), via Claude Code CLI | Mike Dodds (Galois, Inc) |
+| **Theorem style** | Universal — names `dirMap` and `cycleStep` explicitly | Existential — asserts `∃ d, ...`, construction is a witness |
+| **Proof strategy** | Block decomposition pipeline: step lemmas → fiber cycles → iterated laps → block transitions → entry point periodicity → no early return | Fiber-by-fiber with additive order analysis; "secondary coordinate advances by 2 at each return to fiber 0" |
+| **Code structure** | 6 files, 2238 lines; `BlockAnalysis.lean` handles all 3 cycles | 8 files; separate `Cycle0/1/2.lean` per cycle, plus `Orbit.lean` for cycle theory |
+| **TCB analysis** | Not explicit | Explicit — identifies 5 declarations (5% of codebase) as the trusted computing base |
+| **Computational checks** | `native_decide` verification for m = 3, 5 | — |
+
+The two formalizations make complementary design choices. The existential
+statement in septract's version minimizes the trusted computing base — only
+the theorem statement and a few definitions need manual review, since the
+27-case direction function appears only as a kernel-verified witness. This
+repo takes the opposite approach: the direction maps are named top-level
+definitions, making the construction auditable but placing more of the
+codebase in the TCB. Both strategies are valid; they reflect different
+priorities (auditability of construction vs. minimality of trust).
+
 ## License
 
 Apache 2.0 — see [LICENSE](LICENSE).
